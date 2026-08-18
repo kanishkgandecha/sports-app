@@ -1,5 +1,5 @@
 {
-  "name": "@sports/providers-f1-openf1",
+  "name": "@sports/providers-f1-shared",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,12 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@sports/domain": "workspace:*",
-    "@sports/providers-core": "workspace:*",
-    "@sports/providers-f1-shared": "workspace:*"
+    "@sports/domain": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }

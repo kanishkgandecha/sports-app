@@ -55,4 +55,36 @@ export const config = {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
+
+  /**
+   * Checkpoint 6 — standings are a separate concern from the live-data
+   * provider (`f1Provider`/`F1_PROVIDER`, OpenF1): "jolpica" (default) runs
+   * the real Jolpica-F1 standings sync; "disabled" turns it off without a
+   * code change. See docs/CONTEXT.md Checkpoint 6 §4 "Provider decision".
+   */
+  f1StandingsProvider: process.env.F1_STANDINGS_PROVIDER ?? "jolpica",
+
+  /**
+   * How often the standings sync job re-fetches. Championship standings
+   * change at most once per race weekend — nowhere near the cadence
+   * `f1PollIntervalMs` needs for live sessions — so this defaults to 30
+   * minutes, independently configurable.
+   */
+  f1StandingsPollIntervalMs: Number(process.env.F1_STANDINGS_POLL_INTERVAL_MS ?? 30 * 60 * 1000),
+
+  /**
+   * Which season(s) the standings sync covers. Reuses `F1_BOOTSTRAP_SEASONS`
+   * by default (the same seasons the calendar bootstrap covers, since a
+   * Standing row's season/competition FK targets have to already exist —
+   * see standings.ts) rather than introducing a second season list to keep
+   * in sync by hand; overridable independently via `F1_STANDINGS_SEASONS`.
+   */
+  f1StandingsSeasons: (
+    process.env.F1_STANDINGS_SEASONS ??
+    process.env.F1_BOOTSTRAP_SEASONS ??
+    String(new Date().getFullYear())
+  )
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
 };

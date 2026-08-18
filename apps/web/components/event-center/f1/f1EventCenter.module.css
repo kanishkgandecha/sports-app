@@ -1,0 +1,590 @@
+/*
+ * F1 skin layer (ARCHITECTURE.md §2's layering: tokens -> primitives ->
+ * live-data components -> sport skin). Everything here reads design tokens
+ * — no hardcoded colors, sizes, or durations — see docs/CONTEXT.md §10.
+ * CSS Modules used here specifically (not inline styles, Phase 0's pattern
+ * elsewhere) because this surface genuinely needs hover states, responsive
+ * breakpoints, and transitions inline styles can't express.
+ */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ---- header --------------------------------------------------------- */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.headerTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.fixtureName {
+  font-size: var(--font-size-2xl);
+  text-wrap: balance;
+}
+
+.venue {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.sessionLabel {
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+/* ---- session selector ------------------------------------------------ */
+
+.sessionTabs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.sessionTab {
+  flex: 0 0 auto;
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.sessionTab:hover {
+  border-color: var(--color-text-faint);
+  color: var(--color-text);
+}
+
+.sessionTab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.sessionTabActive {
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--color-bg);
+}
+
+.sessionTabActive:hover {
+  color: var(--color-bg);
+  border-color: var(--color-text);
+}
+
+/* ---- main layout ------------------------------------------------------ */
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+@media (min-width: 860px) {
+  .mainGrid {
+    /* Timing tower dominates — 3:2 rather than an even split, per this
+       checkpoint's information-hierarchy requirement. */
+    grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
+    align-items: start;
+  }
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* ---- section shell (shared by timing/race-control/pit-stops) --------- */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* ---- timing tower ------------------------------------------------------ */
+
+.timingScroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.timingTable {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-data);
+  font-size: var(--font-size-sm);
+}
+
+.timingTable thead th {
+  position: sticky;
+  top: 0;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  background: var(--color-surface-2);
+  padding: var(--space-2) var(--space-3);
+  white-space: nowrap;
+}
+
+.timingRow td {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.timingRow {
+  transition: background var(--duration-base) var(--ease-standard);
+}
+
+.timingRow:hover {
+  background: var(--color-surface-2);
+}
+
+.leaderRow td {
+  font-weight: 700;
+}
+
+.position {
+  font-weight: 700;
+  width: 2.5em;
+}
+
+.driverCell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-body);
+}
+
+.teamSwatch {
+  width: 4px;
+  align-self: stretch;
+  border-radius: var(--radius-full);
+  flex: 0 0 auto;
+}
+
+.driverCode {
+  font-family: var(--font-data);
+  font-weight: 700;
+}
+
+.driverFullName {
+  color: var(--color-text-faint);
+  font-size: var(--font-size-xs);
+}
+
+.tyre {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 50%;
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 800;
+  border: 1.5px solid currentColor;
+}
+
+/* Standardized F1 tyre-compound colors — real-world sport convention, not
+   a re-skin of the shared semantic tokens (live/delayed/offline/positive/
+   negative stay untouched). This is what "sport-specific visual identity
+   in the skin layer" (design principle §15) means concretely. */
+.tyreSoft {
+  color: #e10600;
+}
+.tyreMedium {
+  color: #ffb800;
+}
+.tyreHard {
+  color: var(--color-text);
+}
+.tyreIntermediate {
+  color: #2f9e44;
+}
+.tyreWet {
+  color: #1c7ed6;
+}
+
+/* Position-change flash — respects prefers-reduced-motion via the token
+   layer (durations zero out) and, belt-and-suspenders, directly here too. */
+.valueChanged {
+  animation: settle var(--duration-slow) var(--ease-standard);
+}
+
+@keyframes settle {
+  from {
+    background: var(--color-accent-soft);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .valueChanged {
+    animation: none;
+  }
+}
+
+.positionUp {
+  color: var(--color-positive);
+}
+
+.positionDown {
+  color: var(--color-negative);
+}
+
+/* ---- standings (Checkpoint 6) ------------------------------------------ */
+
+/* A tab switcher, same interaction shape as .sessionTab but semantically
+   distinct (drivers/constructors, not session type) — kept as its own
+   rule set rather than reusing .sessionTab's class name for a different
+   thing, even though the declarations below intentionally mirror it. */
+.standingsToggle {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.standingsToggleButton {
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.standingsToggleButton:hover {
+  border-color: var(--color-text-faint);
+  color: var(--color-text);
+}
+
+.standingsToggleButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.standingsToggleButtonActive {
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--color-bg);
+}
+
+.standingsToggleButtonActive:hover {
+  color: var(--color-bg);
+  border-color: var(--color-text);
+}
+
+.pointsCell {
+  font-weight: 700;
+}
+
+.winsCell {
+  color: var(--color-text-faint);
+}
+
+/* ---- race control ------------------------------------------------------ */
+
+.raceControlList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  /* A full race can have 100+ messages (confirmed against real backfilled
+     data — Checkpoint 5, docs/CONTEXT.md §10) — without a height cap this
+     pushed the whole page to ~16,000px tall. Scrolls internally instead,
+     same principle as the API's own `take: 100` cap on this list. */
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.raceControlItem {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border-left: 3px solid var(--color-border);
+}
+
+.raceControlItem[data-category="safety_car"],
+.raceControlItem[data-category="vsc"] {
+  border-left-color: var(--color-delayed);
+}
+
+.raceControlItem[data-category="red_flag"] {
+  border-left-color: var(--color-negative);
+}
+
+.raceControlItem[data-category="flag"] {
+  border-left-color: var(--color-live);
+}
+
+.raceControlTime {
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  flex: 0 0 auto;
+  padding-top: 1px;
+}
+
+.raceControlBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.raceControlMessage {
+  font-size: var(--font-size-sm);
+}
+
+/* ---- pit stops ---------------------------------------------------------- */
+
+.pitTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.pitTable th {
+  text-align: left;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-2);
+}
+
+.pitTable td {
+  padding: var(--space-1) var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ---- education ----------------------------------------------------------- */
+
+.educationTrigger {
+  font: inherit;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+
+.educationTrigger:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.educationTrigger:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 40;
+  animation: fadeIn var(--duration-base) var(--ease-standard);
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(360px, 100vw);
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5);
+  gap: var(--space-3);
+  overflow-y: auto;
+  animation: slideIn var(--duration-base) var(--ease-standard);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawerOverlay,
+  .drawer {
+    animation: none;
+  }
+}
+
+.drawerClose {
+  align-self: flex-end;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1);
+}
+
+.drawerClose:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.drawerTitle {
+  font-size: var(--font-size-lg);
+}
+
+.drawerBody {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+  white-space: pre-wrap;
+}
+
+.drawerRelated {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.drawerRelatedLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.drawerRelatedButton {
+  align-self: flex-start;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---- state views (loading/empty/error) ----------------------------------- */
+
+.stateView {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  color: var(--color-text-faint);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.stateViewError {
+  color: var(--color-negative);
+  border-color: color-mix(in srgb, var(--color-negative) 30%, var(--color-border));
+}
+
+/* ---- responsive: mobile ---------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .fixtureName {
+    font-size: var(--font-size-xl);
+  }
+
+  .timingTable {
+    font-size: var(--font-size-xs);
+  }
+
+  .driverFullName {
+    display: none;
+  }
+
+  .drawer {
+    width: 100vw;
+  }
+}

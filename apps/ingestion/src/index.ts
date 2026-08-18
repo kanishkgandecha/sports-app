@@ -3,8 +3,9 @@ import { bootstrapFromProvider } from "./bootstrapSynthetic.js";
 import { publishLiveEvent } from "./publish.js";
 import { config } from "./config";
 import { logger } from "./logger";
-import { resolveF1Provider } from "./providers/registry";
+import { resolveF1Provider, resolveF1StandingsProvider } from "./providers/registry";
 import { runF1Job } from "./f1/job";
+import { runF1StandingsJob } from "./f1/standingsJob";
 
 /**
  * Two independent jobs run in this one process, selected by configuration
@@ -15,6 +16,10 @@ import { runF1Job } from "./f1/job";
  *    pipeline health check" (this file's original comment) still holds.
  * 2. The F1 job (Checkpoint 4, new) — full-calendar bootstrap, then
  *    active-session polling. See apps/ingestion/src/f1/job.ts.
+ * 3. The F1 standings sync (Checkpoint 6, new) — an independent job on its
+ *    own interval, using Jolpica-F1 rather than the live-data provider
+ *    (OpenF1). See apps/ingestion/src/f1/standingsJob.ts and
+ *    docs/CONTEXT.md Checkpoint 6 §4.
  */
 async function runSyntheticJob() {
   const provider = new FakeSportsProvider();
@@ -47,6 +52,17 @@ async function main() {
     // job.ts) and must never take down the synthetic job running alongside it.
     runF1Job(f1Provider).catch((error) => {
       logger.error({ error: error instanceof Error ? error.message : String(error) }, "F1 job crashed");
+    });
+  }
+
+  const f1StandingsProvider = resolveF1StandingsProvider();
+  if (f1StandingsProvider) {
+    logger.info({ provider: f1StandingsProvider.id }, "starting F1 standings sync job");
+    // Not awaited, same reasoning as the F1 job above — runs for the life of
+    // the process on its own interval; a failed tick is caught internally
+    // (standingsJob.ts) and must never take down the other jobs.
+    runF1StandingsJob(f1StandingsProvider, config.f1StandingsSeasons).catch((error) => {
+      logger.error({ error: error instanceof Error ? error.message : String(error) }, "F1 standings job crashed");
     });
   }
 }

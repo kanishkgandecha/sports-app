@@ -1,34 +1,26 @@
-import type { Competition } from "@sports/domain";
+// F1_SPORT_ID/F1_COMPETITION/slugify/buildSeasonId/buildDriverId/
+// yearFromSeasonId moved to @sports/providers-f1-shared at Checkpoint 6 —
+// building the Jolpica adapter needed the exact same driver-id and season-id
+// conventions (verified: Jolpica's `permanentNumber` resolves to the same
+// `f1-driver-{number}` ids this package already builds). Re-exported here
+// so nothing else in this package needed an import-path change.
+import {
+  F1_SPORT_ID,
+  F1_COMPETITION,
+  slugify,
+  buildSeasonId,
+  buildDriverId,
+  yearFromSeasonId,
+  buildTeamId as buildTeamIdFromSlug,
+} from "@sports/providers-f1-shared";
 
-export const F1_SPORT_ID = "f1";
+export { F1_SPORT_ID, F1_COMPETITION, slugify, buildSeasonId, buildDriverId, yearFromSeasonId };
 
-/**
- * There is only ever one Formula 1 World Championship — OpenF1 has no
- * "competition" concept at all (nor does Jolpica-F1). This is a constant the
- * adapter constructs, not something fetched — the same pattern
- * `FakeSportsProvider` already uses for its synthetic competition.
- */
-export const F1_COMPETITION: Competition = {
-  id: "f1-world-championship",
-  sportId: F1_SPORT_ID,
-  slug: "f1-world-championship",
-  name: "FIA Formula One World Championship",
-  type: "championship",
-};
-
-export function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
-export const buildSeasonId = (year: number): string => `f1-season-${year}`;
 export const buildFixtureId = (meetingKey: number): string => `f1-meeting-${meetingKey}`;
 export const buildSessionId = (sessionKey: number): string => `f1-session-${sessionKey}`;
 export const buildVenueId = (circuitKey: number): string => `f1-circuit-${circuitKey}`;
-export const buildDriverId = (driverNumber: number): string => `f1-driver-${driverNumber}`;
-export const buildTeamId = (teamName: string): string => `f1-team-${slugify(teamName)}`;
+/** OpenF1 gives a team_name, not a pre-resolved slug — slugify it here, then apply the shared `f1-team-{slug}` format. */
+export const buildTeamId = (teamName: string): string => buildTeamIdFromSlug(slugify(teamName));
 
 /** Reverses buildFixtureId/buildSessionId — needed because the SportsProvider
  * interface passes our ids back in (getSessions({fixtureId}), etc.), not
@@ -47,14 +39,6 @@ export function sessionKeyFromSessionId(sessionId: string): number {
     throw new Error(`Not an OpenF1 session id: "${sessionId}"`);
   }
   return key;
-}
-
-export function yearFromSeasonId(seasonId: string): number {
-  const year = Number(seasonId.replace("f1-season-", ""));
-  if (Number.isNaN(year)) {
-    throw new Error(`Not an OpenF1 season id: "${seasonId}"`);
-  }
-  return year;
 }
 
 /**

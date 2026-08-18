@@ -15,6 +15,10 @@ describe("loadConcepts", () => {
     expect(slugs).toContain("safety-car");
     expect(slugs).toContain("vsc");
     expect(slugs).toContain("what-is-f1");
+    // Checkpoint 6 — the smallest new concept needed for the standings UI
+    // (docs/CONTEXT.md Checkpoint 6 §6): nothing existing explained how
+    // points/positions are actually determined.
+    expect(slugs).toContain("championship-points");
   });
 });
 
@@ -43,5 +47,15 @@ describe("EducationIndex", () => {
   it("resolves related concepts", () => {
     const related = index.related("safety-car");
     expect(related.map((c) => c.slug)).toEqual(expect.arrayContaining(["vsc", "red-flag"]));
+  });
+
+  it("chains 'why did this happen' from championship-points back to what-is-f1", () => {
+    const preceding = index.precededBy("championship-points");
+    expect(preceding.map((c) => c.slug)).toContain("what-is-f1");
+  });
+
+  it("resolves what-is-f1 as related to championship-points, alongside grand-prix", () => {
+    const related = index.related("what-is-f1");
+    expect(related.map((c) => c.slug)).toEqual(expect.arrayContaining(["grand-prix", "championship-points"]));
   });
 });
