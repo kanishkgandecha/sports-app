@@ -1,0 +1,17 @@
+node_modules/
+.pnpm-store/
+dist/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+prisma/generated/
+coverage/
+
+# Planning/approval docs — working notes, not part of the shipped repo.
+docs/
+
+.claude/

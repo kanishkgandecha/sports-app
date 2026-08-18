@@ -1,0 +1,231 @@
+// Core schema — see ARCHITECTURE.md §5 for the terminology and reasoning.
+// Sport-specific extension tables (F1 first) are added as their own models
+// below, one phase at a time — never retrofitted into the core tables.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Core (shared across every sport)
+// ---------------------------------------------------------------------------
+
+model Sport {
+  id     String @id @default(cuid())
+  slug   String @unique
+  name   String
+  status String // "live" | "beta" | "education-only"
+
+  competitions Competition[]
+  teams        Team[]
+  players      Player[]
+  fixtures     Fixture[]
+  liveEvents   LiveEvent[]
+
+  @@index([slug])
+}
+
+model Competition {
+  id      String @id @default(cuid())
+  sportId String
+  slug    String
+  name    String
+  type    String // "championship" | "league" | "tournament" | "cup"
+
+  sport     Sport      @relation(fields: [sportId], references: [id])
+  seasons   Season[]
+  fixtures  Fixture[]
+  standings Standing[]
+
+  @@unique([sportId, slug])
+  @@index([sportId])
+}
+
+model Season {
+  id            String   @id @default(cuid())
+  competitionId String
+  label         String
+  startDate     DateTime
+  endDate       DateTime
+
+  competition Competition @relation(fields: [competitionId], references: [id])
+  fixtures    Fixture[]
+  standings   Standing[]
+
+  @@unique([competitionId, label])
+  @@index([competitionId])
+}
+
+model Venue {
+  id       String @id @default(cuid())
+  name     String
+  country  String
+  timezone String
+
+  fixtures Fixture[]
+}
+
+model Team {
+  id      String  @id @default(cuid())
+  sportId String
+  name    String
+  slug    String
+  country String?
+
+  sport   Sport    @relation(fields: [sportId], references: [id])
+  players Player[]
+
+  @@unique([sportId, slug])
+  @@index([sportId])
+}
+
+model Player {
+  id      String  @id @default(cuid())
+  sportId String
+  teamId  String?
+  name    String
+  role    String?
+
+  sport Sport @relation(fields: [sportId], references: [id])
+  team  Team? @relation(fields: [teamId], references: [id])
+
+  @@index([sportId])
+  @@index([teamId])
+}
+
+model Fixture {
+  id            String    @id @default(cuid())
+  sportId       String
+  competitionId String
+  seasonId      String
+  slug          String
+  name          String
+  status        String // "scheduled" | "live" | "completed" | "postponed" | "cancelled"
+  startTime     DateTime
+  venueId       String?
+
+  sport       Sport       @relation(fields: [sportId], references: [id])
+  competition Competition @relation(fields: [competitionId], references: [id])
+  season      Season      @relation(fields: [seasonId], references: [id])
+  venue       Venue?      @relation(fields: [venueId], references: [id])
+  sessions    Session[]
+
+  @@unique([sportId, slug])
+  @@index([competitionId, status])
+  @@index([startTime])
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  fixtureId String
+  type      String
+  status    String // "scheduled" | "live" | "completed" | "cancelled"
+  startTime DateTime
+  endTime   DateTime?
+
+  fixture    Fixture     @relation(fields: [fixtureId], references: [id])
+  liveEvents LiveEvent[]
+
+  @@index([fixtureId])
+  @@index([status])
+}
+
+/// Append-only. Never mutated after insert — corrections arrive as new rows.
+model LiveEvent {
+  id        String   @id @default(cuid())
+  sportId   String
+  sessionId String
+  eventType String
+  timestamp DateTime
+  source    String
+  payload   Json
+
+  sport   Sport   @relation(fields: [sportId], references: [id])
+  session Session @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId, timestamp])
+  @@index([eventType])
+}
+
+model Standing {
+  id            String @id @default(cuid())
+  competitionId String
+  seasonId      String
+  entityType    String // "team" | "player"
+  entityId      String
+  points        Float
+  position      Int
+  extra         Json
+
+  competition Competition @relation(fields: [competitionId], references: [id])
+  season      Season      @relation(fields: [seasonId], references: [id])
+
+  @@unique([seasonId, entityType, entityId])
+  @@index([competitionId, seasonId])
+}
+
+/// Raw provider payloads, retained for debugging/audit only — never the
+/// primary application model (ARCHITECTURE.md §4, master brief §19).
+model ProviderRawResponse {
+  id         String   @id @default(cuid())
+  providerId String
+  method     String
+  requestedAt DateTime
+  body       Json
+
+  @@index([providerId, requestedAt])
+}
+
+// Education content deliberately has no table here. EducationConcept lives
+// as version-controlled Markdown/MDX under /content/education and is read
+// straight off disk by @sports/education (see ARCHITECTURE.md §6) — no
+// database sync step, no CMS, until the relationship set actually outgrows
+// what a developer can maintain by hand in files.
+
+// ---------------------------------------------------------------------------
+// F1 extension (Phase 1) — see ARCHITECTURE.md §5
+// ---------------------------------------------------------------------------
+
+model DriverTiming {
+  id            String  @id @default(cuid())
+  sessionId     String
+  driverId      String
+  position      Int
+  gapToLeader   String?
+  lastLapTime   String?
+  bestLapTime   String?
+  sector1       String?
+  sector2       String?
+  sector3       String?
+  tyreCompound  String?
+  state         String // "running" | "out" | "dnf" | "dsq" | "dns"
+
+  @@unique([sessionId, driverId])
+  @@index([sessionId, position])
+}
+
+model PitStop {
+  id          String   @id @default(cuid())
+  sessionId   String
+  driverId    String
+  lap         Int
+  durationMs  Int
+  timestamp   DateTime
+
+  @@index([sessionId, driverId])
+}
+
+model RaceControlMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  timestamp DateTime
+  category  String // "flag" | "safety_car" | "vsc" | "red_flag" | "message"
+  message   String
+
+  @@index([sessionId, timestamp])
+}
