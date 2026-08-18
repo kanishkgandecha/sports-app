@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiGet } from "../../../lib/api";
 import styles from "./f1EventCenter.module.css";
 
@@ -23,6 +23,50 @@ export function GlossaryDrawer({ slug, onClose, onNavigate }: { slug: string; on
   const [data, setData] = useState<ConceptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Checkpoint 7 (keyboard accessibility) — a dialog that opens without
+  // moving focus into it, and never gives it back, is a real trap for a
+  // keyboard/screen-reader user: focus stays on (or is lost from) whatever
+  // was behind the drawer. On open, move focus to the close button (the
+  // one control guaranteed to exist regardless of loading/error/data
+  // state); on close, restore it to whatever had focus before the drawer
+  // opened (the EducationTrigger that opened it) — not just "somewhere,"
+  // the actual origin, since a Tab from there should resume exactly where
+  // the user left off.
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    return () => previouslyFocused?.focus();
+    // Intentionally only on mount/unmount, not on `slug` change — the
+    // drawer instance persists across in-drawer "related concept"
+    // navigation (onNavigate), which must NOT re-trigger this and steal
+    // focus back to the close button mid-read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Minimal, scoped Tab-wrap for this one drawer — not a generic reusable
+  // focus-trap abstraction (deliberately: this checkpoint's own "do not
+  // over-engineer accessibility abstractions" rule). Only Tab/Shift+Tab at
+  // the two ends of the drawer's own focusable set wrap around; Escape
+  // (below) still closes exactly as before.
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key !== "Tab" || !drawerRef.current) return;
+    const focusable = drawerRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -64,8 +108,15 @@ export function GlossaryDrawer({ slug, onClose, onNavigate }: { slug: string; on
     <>
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div className={styles.drawerOverlay} onClick={onClose} aria-hidden="true" />
-      <aside className={styles.drawer} role="dialog" aria-modal="true" aria-label="Concept explanation">
-        <button type="button" className={styles.drawerClose} onClick={onClose}>
+      <aside
+        ref={drawerRef}
+        className={styles.drawer}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Concept explanation"
+        onKeyDown={handleKeyDown}
+      >
+        <button type="button" ref={closeButtonRef} className={styles.drawerClose} onClick={onClose}>
           Close
         </button>
         {loading && <p className={styles.drawerBody}>Loading…</p>}

@@ -2,18 +2,12 @@ import Link from "next/link";
 import { apiGet } from "../lib/api";
 import type { F1Fixture } from "../lib/f1Api";
 import { ConceptChip } from "../components/ConceptChip";
-import { LiveTicker } from "../components/LiveTicker";
+import styles from "./home.module.css";
 
-interface Sport {
-  slug: string;
-  name: string;
-  status: string;
-}
-
-async function getSports(): Promise<Sport[]> {
+async function getF1Fixtures(): Promise<F1Fixture[]> {
   try {
-    const { sports } = await apiGet<{ sports: Sport[] }>("/api/sports");
-    return sports;
+    const { fixtures } = await apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures");
+    return fixtures;
   } catch {
     // API not running yet — the shell still renders so design/education work
     // isn't blocked on the backend being up.
@@ -21,145 +15,145 @@ async function getSports(): Promise<Sport[]> {
   }
 }
 
-async function getF1Fixtures(): Promise<F1Fixture[]> {
-  try {
-    const { fixtures } = await apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures");
-    return fixtures;
-  } catch {
-    return [];
-  }
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+const PLANNED_SPORTS = [
+  { name: "Cricket", slug: "cricket", pill: "Coming next", pillClass: "pillComingNext" as const, blurb: "Provider research underway — see Checkpoint 7." },
+  { name: "Football", slug: "football", pill: "Planned", pillClass: "pillPlanned" as const, blurb: "After Cricket, per the fixed build order." },
+  { name: "Esports", slug: "esports", pill: "Planned", pillClass: "pillPlanned" as const, blurb: "Esports World Cup coverage, last in the build order." },
+];
+
+/**
+ * The home feed (Checkpoint 7 §"Live home feed"): LIVE / UPCOMING /
+ * RESULTS, across all sports — today that means real F1 data in each
+ * bucket and honest coming-soon cards for every other sport. Nothing here
+ * fabricates Cricket/Football/Esports data to fill space.
+ */
 export default async function HomePage() {
-  const [sports, fixtures] = await Promise.all([getSports(), getF1Fixtures()]);
+  const fixtures = await getF1Fixtures();
+
+  const live = fixtures.filter((f) => f.status === "live");
+  const upcoming = [...fixtures.filter((f) => f.status === "scheduled")]
+    .sort((a, b) => a.startTime.localeCompare(b.startTime))
+    .slice(0, 5);
+  const results = [...fixtures.filter((f) => f.status === "completed")]
+    .sort((a, b) => b.startTime.localeCompare(a.startTime))
+    .slice(0, 5);
 
   return (
     <>
-      <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-        <h1 style={{ fontSize: "var(--font-size-3xl)" }}>Live sports, explained as they happen.</h1>
-        <p style={{ margin: 0, color: "var(--color-text-muted)", maxWidth: "60ch" }}>
-          Follow Formula 1, cricket, football, and esports live — with a plain-language
-          explanation one tap away whenever something you don&apos;t recognize happens.
-        </p>
+      <section className={styles.hero}>
+        <div className={styles.heroInner}>
+          <span className={styles.eyebrow}>
+            <span className={styles.eyebrowDot} aria-hidden="true" />
+            Live sports, explained as they happen
+          </span>
+          <h1 className={styles.heroTitle}>Follow the race. Understand every moment.</h1>
+          <p className={styles.heroLede}>
+            Real-time Formula 1 — timing, race control, standings — with a plain-language
+            explanation one tap away whenever something you don&apos;t recognize happens.
+            Cricket, football, and esports follow the same way, one sport at a time.
+          </p>
+          <div className={styles.heroActions}>
+            <Link href="/sports/f1" className={styles.buttonPrimary}>
+              Open F1 →
+            </Link>
+            <Link href="/learn" className={styles.buttonSecondary}>
+              New to live sports? Start here
+            </Link>
+          </div>
+        </div>
       </section>
 
-      <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-        <h2 style={{ fontSize: "var(--font-size-lg)" }}>Sports</h2>
-        <ul
-          style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-            gap: "var(--space-3)",
-          }}
-        >
-          {sports.length === 0 && (
-            <li style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
-              No sports loaded — start the API (see README) to populate this from the sport
-              registry.
-            </li>
-          )}
-          {sports.map((sport) => (
-            <li
-              key={sport.slug}
-              style={{
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-md)",
-                padding: "var(--space-4)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "var(--space-1)",
-              }}
-            >
-              <strong>{sport.name}</strong>
-              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-faint)" }}>
-                {sport.status}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {live.length > 0 && (
+        <section className={styles.feedSection} aria-label="Live now">
+          <div className={styles.feedHeader}>
+            <h2 className={`${styles.feedTitle} ${styles.feedTitleLive}`}>Live now</h2>
+            <span className={styles.feedCount}>{live.length}</span>
+          </div>
+          <FixtureList fixtures={live} showRelativeTime={false} />
+        </section>
+      )}
 
-      <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-        <h2 style={{ fontSize: "var(--font-size-lg)" }}>Formula 1 — Event Center</h2>
-        {fixtures.length === 0 ? (
+      <section className={styles.feedSection} aria-label="Upcoming">
+        <div className={styles.feedHeader}>
+          <h2 className={styles.feedTitle}>Upcoming</h2>
+          <span className={styles.feedCount}>{upcoming.length}</span>
+        </div>
+        {upcoming.length === 0 ? (
           <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)", margin: 0 }}>
-            No F1 fixtures bootstrapped yet — start the ingestion worker (see README) to
+            No upcoming F1 sessions loaded — start the ingestion worker (see README) to
             populate this from the calendar.
           </p>
         ) : (
-          <ul
-            style={{
-              listStyle: "none",
-              margin: 0,
-              padding: 0,
-              display: "flex",
-              flexDirection: "column",
-              gap: "var(--space-2)",
-            }}
-          >
-            {fixtures.map((fixture) => (
-              <li key={fixture.id}>
-                <Link
-                  href={`/events/${fixture.id}`}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "var(--space-3)",
-                    padding: "var(--space-3) var(--space-4)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: "var(--radius-md)",
-                    color: "var(--color-text)",
-                  }}
-                >
-                  <span>
-                    <strong>{fixture.name}</strong>
-                    {fixture.venue && (
-                      <span style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
-                        {" "}
-                        — {fixture.venue.name}
-                      </span>
-                    )}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-data)",
-                      fontSize: "var(--font-size-xs)",
-                      color: "var(--color-text-faint)",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {fixture.status}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <FixtureList fixtures={upcoming} showRelativeTime />
         )}
       </section>
 
-      <section
-        style={{
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-lg)",
-          padding: "var(--space-5)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "var(--space-2)",
-        }}
-      >
-        <h2 style={{ fontSize: "var(--font-size-lg)" }}>New to Formula 1?</h2>
+      <section className={styles.feedSection} aria-label="Recent results">
+        <div className={styles.feedHeader}>
+          <h2 className={styles.feedTitle}>Recent results</h2>
+          <span className={styles.feedCount}>{results.length}</span>
+        </div>
+        {results.length === 0 ? (
+          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)", margin: 0 }}>
+            No completed F1 sessions loaded yet.
+          </p>
+        ) : (
+          <FixtureList fixtures={results} showRelativeTime />
+        )}
+      </section>
+
+      <section className={styles.feedSection} aria-label="All sports">
+        <div className={styles.feedHeader}>
+          <h2 className={styles.feedTitle}>All sports</h2>
+        </div>
+        <div className={styles.sportGrid}>
+          <Link href="/sports/f1" className={`${styles.sportCard} ${styles.sportCardAvailable}`}>
+            <span className={`${styles.pill} ${styles.pillLive}`}>Live</span>
+            <span className={styles.sportCardTitle}>Formula 1</span>
+            <p className={styles.sportCardMeta}>Timing, race control, standings — live.</p>
+          </Link>
+          {PLANNED_SPORTS.map((sport) => (
+            <Link key={sport.slug} href={`/sports/${sport.slug}`} className={styles.sportCard}>
+              <span className={`${styles.pill} ${styles[sport.pillClass]}`}>{sport.pill}</span>
+              <span className={styles.sportCardTitle}>{sport.name}</span>
+              <p className={styles.sportCardMeta}>{sport.blurb}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.educationTeaser}>
+        <h2 className={styles.educationTeaserTitle}>New to live sports?</h2>
         <p style={{ margin: 0, color: "var(--color-text-muted)", fontSize: "var(--font-size-sm)" }}>
-          Education is optional and contextual — it never blocks the live experience
-          (master brief §13). Try it:
+          Education is optional and contextual — it never blocks the live experience. Try it:
         </p>
         <ConceptChip slug="safety-car" label="Safety Car" />
       </section>
-
-      <LiveTicker />
     </>
+  );
+}
+
+function FixtureList({ fixtures, showRelativeTime }: { fixtures: F1Fixture[]; showRelativeTime: boolean }) {
+  return (
+    <ul className={styles.fixtureList}>
+      {fixtures.map((fixture) => (
+        <li key={fixture.id}>
+          <Link href={`/events/${fixture.id}`} className={styles.fixtureRow}>
+            <span className={styles.fixtureName}>
+              <span className={styles.fixtureNameText}>{fixture.name}</span>
+              {fixture.venue && <span className={styles.fixtureVenue}>{fixture.venue.name}, {fixture.venue.country}</span>}
+            </span>
+            <span className={styles.fixtureMeta}>
+              {showRelativeTime && <span>{formatDate(fixture.startTime)}</span>}
+              <span>{fixture.status.toUpperCase()}</span>
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

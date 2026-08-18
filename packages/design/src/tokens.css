@@ -41,7 +41,14 @@
   --color-negative: #c23b3b;
 
   /* ---- typography ------------------------------------------------------ */
-  --font-display: ui-sans-serif, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Checkpoint 7 — `--font-display-loaded` is set by apps/web/app/fonts.ts
+     via next/font (self-hosted, no CDN), attached to <html> in layout.tsx.
+     The `var(..., ui-sans-serif)` fallback keeps this token resolvable
+     (system stack) in any context that never loads that font — a Storybook-
+     style isolated render of a design-system component, a test environment,
+     or simply before the checkpoint that wires it up. See tokens.ts's doc
+     comment — this is exactly the swap-in point it always planned for. */
+  --font-display: var(--font-display-loaded, ui-sans-serif), "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-body: ui-sans-serif, "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-data: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
 

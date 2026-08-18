@@ -116,10 +116,10 @@ function DriverStandingsTable({ rows, loading, error }: { rows: F1DriverStanding
       <table className={styles.timingTable}>
         <thead>
           <tr>
-            <th>Pos</th>
-            <th>Driver</th>
-            <th>Points</th>
-            <th>Wins</th>
+            <th scope="col">Pos</th>
+            <th scope="col">Driver</th>
+            <th scope="col">Points</th>
+            <th scope="col">Wins</th>
           </tr>
         </thead>
         <tbody>
@@ -153,10 +153,10 @@ function ConstructorStandingsTable({ rows, loading, error }: { rows: F1Construct
       <table className={styles.timingTable}>
         <thead>
           <tr>
-            <th>Pos</th>
-            <th>Team</th>
-            <th>Points</th>
-            <th>Wins</th>
+            <th scope="col">Pos</th>
+            <th scope="col">Team</th>
+            <th scope="col">Points</th>
+            <th scope="col">Wins</th>
           </tr>
         </thead>
         <tbody>

@@ -71,6 +71,28 @@ describe("GlossaryDrawer", () => {
     expect(screen.getAllByText("Grand Prix")).toHaveLength(1);
   });
 
+  it("moves focus to the Close button on open (Checkpoint 7 — a dialog that opens without moving focus traps a keyboard user)", async () => {
+    mockApiGet.mockResolvedValueOnce(SAFETY_CAR_RESPONSE);
+    render(<GlossaryDrawer slug="safety-car" onClose={vi.fn()} onNavigate={vi.fn()} />);
+    expect(screen.getByText("Close")).toHaveFocus();
+  });
+
+  it("restores focus to whatever triggered it once the drawer unmounts", async () => {
+    mockApiGet.mockResolvedValueOnce(SAFETY_CAR_RESPONSE);
+    const trigger = document.createElement("button");
+    trigger.textContent = "open";
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(trigger).toHaveFocus();
+
+    const { unmount } = render(<GlossaryDrawer slug="safety-car" onClose={vi.fn()} onNavigate={vi.fn()} />);
+    expect(trigger).not.toHaveFocus();
+
+    unmount();
+    expect(trigger).toHaveFocus();
+    trigger.remove();
+  });
+
   it("re-fetches when the slug prop changes (navigating within the same drawer instance)", async () => {
     mockApiGet.mockResolvedValueOnce(SAFETY_CAR_RESPONSE);
     const { rerender } = render(<GlossaryDrawer slug="safety-car" onClose={vi.fn()} onNavigate={vi.fn()} />);

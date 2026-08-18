@@ -14,9 +14,9 @@ export function PitStopList({ stops, loading, error }: { stops: F1PitStop[]; loa
     <table className={styles.pitTable}>
       <thead>
         <tr>
-          <th>Driver</th>
-          <th>Lap</th>
-          <th>Duration</th>
+          <th scope="col">Driver</th>
+          <th scope="col">Lap</th>
+          <th scope="col">Duration</th>
         </tr>
       </thead>
       <tbody>

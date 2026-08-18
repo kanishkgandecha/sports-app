@@ -587,4 +587,16 @@
   .drawer {
     width: 100vw;
   }
+
+  /* Real touch-target sizes, found by actually measuring (not assuming)
+     rendered bounding boxes at 390px — Checkpoint 7 §3: session/standings
+     tabs measured 32px tall, under the ~44px minimum usable touch target.
+     Desktop keeps the denser padding (§ "dense but readable" — a mouse
+     pointer doesn't need this). */
+  .sessionTab,
+  .standingsToggleButton {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
 }

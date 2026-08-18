@@ -1,0 +1,117 @@
+/*
+ * Site-wide navigation shell (Checkpoint 7 — F1 UI polish). Reads only
+ * design tokens, same discipline as the F1 skin's own CSS module — see
+ * docs/CONTEXT.md, Checkpoint 7 §2.
+ */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* A small mark, not a logo asset — a deliberate geometric shape (not a
+   generic circle-in-a-box) that reads at 20px and scales with the type. */
+.brandMark {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-strong));
+  clip-path: polygon(0 100%, 0 40%, 60% 0, 100% 0, 100% 60%, 40% 100%);
+}
+
+.links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.links::-webkit-scrollbar {
+  display: none;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
+}
+
+.link:hover {
+  color: var(--color-text);
+  background: var(--color-surface-2);
+}
+
+.linkActive {
+  color: var(--color-text);
+  background: var(--color-surface-2);
+}
+
+/* A real link (not a dead-end) but visually distinct from active/available
+   sports — the nav has to be honest about what's actually built (§ nav
+   requirement: "do not expose unfinished pages as if they were production-
+   ready"). */
+.linkComingSoon {
+  color: var(--color-text-faint);
+}
+
+.badge {
+  font-family: var(--font-data);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+.badgeMuted {
+  background: var(--color-surface-2);
+  color: var(--color-text-faint);
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: var(--space-3) var(--space-4);
+    gap: var(--space-3);
+  }
+  .brand span:last-child {
+    display: none;
+  }
+  /* Measured 37px at 390px — under the ~44px usable touch-target minimum
+     (docs/CONTEXT.md, Checkpoint 7 §3). Desktop's tighter, mouse-driven
+     sizing is unaffected. */
+  .link {
+    min-height: 44px;
+  }
+}
