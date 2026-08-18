@@ -71,11 +71,13 @@ model Venue {
 }
 
 model Team {
-  id      String  @id @default(cuid())
-  sportId String
-  name    String
-  slug    String
-  country String?
+  id       String  @id @default(cuid())
+  sportId  String
+  name     String
+  slug     String
+  country  String?
+  /// Brand/kit color e.g. "#3671C6". Cross-sport, not F1-specific — see docs/CONTEXT.md §7.4.2.
+  colorHex String?
 
   sport   Sport    @relation(fields: [sportId], references: [id])
   players Player[]
@@ -85,11 +87,15 @@ model Team {
 }
 
 model Player {
-  id      String  @id @default(cuid())
-  sportId String
-  teamId  String?
-  name    String
-  role    String?
+  id        String  @id @default(cuid())
+  sportId   String
+  teamId    String?
+  name      String
+  role      String?
+  /// Abbreviated display code, e.g. F1's "VER". Cross-sport — see docs/CONTEXT.md §7.4.3.
+  shortName String?
+  /// Athlete photo/headshot. Cross-sport — see docs/CONTEXT.md §7.4.3.
+  avatarUrl String?
 
   sport Sport @relation(fields: [sportId], references: [id])
   team  Team? @relation(fields: [teamId], references: [id])
@@ -192,18 +198,22 @@ model ProviderRawResponse {
 // ---------------------------------------------------------------------------
 
 model DriverTiming {
-  id            String  @id @default(cuid())
-  sessionId     String
-  driverId      String
-  position      Int
-  gapToLeader   String?
-  lastLapTime   String?
-  bestLapTime   String?
-  sector1       String?
-  sector2       String?
-  sector3       String?
-  tyreCompound  String?
-  state         String // "running" | "out" | "dnf" | "dsq" | "dns"
+  id              String  @id @default(cuid())
+  sessionId       String
+  driverId        String
+  position        Int
+  /// Numeric seconds, or literally "+N LAP(S)" if lapped — mixed type at the OpenF1 source.
+  gapToLeader     String?
+  /// Gap to the car immediately ahead — same mixed-type reasoning as gapToLeader. See docs/CONTEXT.md §7.4.6.
+  intervalToAhead String?
+  /// Raw seconds (not formatted strings — corrected from the Phase 0 guess, see docs/CONTEXT.md §7.4.5).
+  lastLapTime     Float?
+  bestLapTime     Float?
+  sector1         Float?
+  sector2         Float?
+  sector3         Float?
+  tyreCompound    String?
+  state           String // "running" | "out" | "dnf" | "dsq" | "dns"
 
   @@unique([sessionId, driverId])
   @@index([sessionId, position])

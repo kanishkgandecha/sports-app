@@ -65,6 +65,7 @@ export class FakeSportsProvider implements SportsProvider {
     name: "Synthetic Team",
     slug: "synthetic-team",
     country: null,
+    colorHex: null,
   };
 
   private readonly player: Player = {
@@ -73,6 +74,8 @@ export class FakeSportsProvider implements SportsProvider {
     teamId: this.team.id,
     name: "Synthetic Player",
     role: null,
+    shortName: null,
+    avatarUrl: null,
   };
 
   private sequence = 0;

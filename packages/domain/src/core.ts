@@ -54,6 +54,8 @@ export interface Team {
   name: string;
   slug: string;
   country: string | null;
+  /** Brand/kit color, e.g. "#3671C6". Cross-sport — not F1-specific (see docs/CONTEXT.md §7.4.2). */
+  colorHex: string | null;
 }
 
 export interface Player {
@@ -62,6 +64,10 @@ export interface Player {
   teamId: string | null;
   name: string;
   role: string | null;
+  /** Abbreviated display name/code, e.g. F1's 3-letter driver code "VER". Cross-sport (§7.4.3). */
+  shortName: string | null;
+  /** Athlete photo/headshot. Cross-sport (§7.4.3). */
+  avatarUrl: string | null;
 }
 
 export type FixtureStatus = "scheduled" | "live" | "completed" | "postponed" | "cancelled";
