@@ -137,3 +137,45 @@ export interface MatchStatusPayload {
 
 export const CRICKET_EVENT_TYPES = ["BALL", "SCORE_UPDATE", "WICKET", "MATCH_STATUS"] as const;
 export type CricketEventType = (typeof CRICKET_EVENT_TYPES)[number];
+
+/**
+ * Cricket Checkpoint 2 — the batting scorecard/bowling figures Checkpoint
+ * 2's brief explicitly asks for. Not part of the original Checkpoint 1
+ * proposal (which only covered aggregate innings state), but every field
+ * below was confirmed real and populated in Checkpoint 1's research
+ * (`match_scorecard`'s `batting[]`/`bowling[]` entries — see the adapter
+ * package's `types.ts`) — not a speculative addition, the direct,
+ * minimum-necessary shape for what this checkpoint was asked to build.
+ * Deliberately excludes `extras`/`totals` (verified genuinely empty `{}`
+ * on every real scorecard block captured — nothing there to normalize).
+ *
+ * One row per batsman/bowler per innings — current-state, the same
+ * "upserted in place, not append-only" pattern as `CricketInningsState`.
+ */
+export interface CricketBattingFigure {
+  id: string;
+  sessionId: string;
+  playerId: string;
+  /** Batting order within the innings — real data order, used for display, not re-derived. */
+  battingOrder: number;
+  runs: number;
+  balls: number;
+  fours: number;
+  sixes: number;
+  strikeRate: number;
+  /** The real, verbatim `dismissal-text` field — "not out", or a real description like "run out (Neema Pius)". Never re-derived from `dismissal`/`bowler`/`catcher` — the provider's own text is authoritative and already human-readable. */
+  dismissalText: string;
+}
+
+export interface CricketBowlingFigure {
+  id: string;
+  sessionId: string;
+  playerId: string;
+  /** Order bowlers appear in the real scorecard — used for display, not re-derived. */
+  bowlingOrder: number;
+  overs: number;
+  maidens: number;
+  runsConceded: number;
+  wickets: number;
+  economy: number;
+}

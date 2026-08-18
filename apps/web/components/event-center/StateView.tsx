@@ -1,4 +1,4 @@
-import styles from "./f1/f1EventCenter.module.css";
+import styles from "../sharedEventCenter.module.css";
 
 /**
  * One shared shape for every section's loading/empty/error state

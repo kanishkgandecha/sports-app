@@ -1,30 +1,46 @@
 import { prisma } from "@sports/db";
 import type { SportsProvider } from "@sports/providers-core";
-import type { cricket } from "@sports/domain";
+import type { cricket, Player, Team } from "@sports/domain";
 import { config } from "../config";
 import { logger } from "../logger";
 import { publishLiveEvent } from "../publish";
 import { bootstrapCricketCurrent } from "./bootstrap";
 import { getActiveCricketSessions } from "./activeSessions";
-import { upsertCricketFixtureDetail, upsertCricketInningsState } from "./persist";
+import {
+  upsertCricketBattingFigure,
+  upsertCricketBowlingFigure,
+  upsertCricketFixtureDetail,
+  upsertCricketInningsState,
+  upsertCricketRoster,
+} from "./persist";
 
 /**
- * `getInningsState`/`getFixtureDetail` are bonus methods on
- * `CricketDataAdapter`, deliberately not on the shared `SportsProvider`
- * interface — same reasoning and pattern as F1's `getDriverTimingPatches`
- * (`CurrentStateCapableProvider` in `../f1/job.ts`): current-state shapes
- * are genuinely sport-specific, and widening the shared interface for a
- * capability other sports won't share the shape of isn't worth it.
+ * `getInningsState`/`getFixtureDetail`/`getScorecard`/`getRosterForFixture`
+ * are bonus methods on `CricketDataAdapter`, deliberately not on the
+ * shared `SportsProvider` interface — same reasoning and pattern as F1's
+ * `getDriverTimingPatches` (`CurrentStateCapableProvider` in
+ * `../f1/job.ts`): current-state shapes are genuinely sport-specific, and
+ * widening the shared interface for a capability other sports won't share
+ * the shape of isn't worth it. All four are grouped into this one check —
+ * `CricketDataAdapter` always has all four together, and a provider with
+ * only some of them isn't a real scenario this needs to handle separately.
  */
 interface CricketStateCapableProvider extends SportsProvider {
   getInningsState(fixtureId: string): Promise<cricket.CricketInningsState[]>;
   getFixtureDetail(fixtureId: string): Promise<cricket.CricketFixtureDetail | undefined>;
+  getScorecard(
+    fixtureId: string,
+  ): Promise<Array<{ sessionId: string; batting: cricket.CricketBattingFigure[]; bowling: cricket.CricketBowlingFigure[] } | undefined>>;
+  getRosterForFixture(fixtureId: string): Promise<{ teams: Team[]; players: Player[] }>;
 }
 
 function hasCricketState(provider: SportsProvider): provider is CricketStateCapableProvider {
+  const p = provider as Partial<CricketStateCapableProvider>;
   return (
-    typeof (provider as Partial<CricketStateCapableProvider>).getInningsState === "function" &&
-    typeof (provider as Partial<CricketStateCapableProvider>).getFixtureDetail === "function"
+    typeof p.getInningsState === "function" &&
+    typeof p.getFixtureDetail === "function" &&
+    typeof p.getScorecard === "function" &&
+    typeof p.getRosterForFixture === "function"
   );
 }
 
@@ -139,15 +155,28 @@ async function pollOneSession(
   let stateRefreshed = false;
   const lastRefresh = lastStateRefresh.get(fixtureId) ?? 0;
   if (hasCricketState(provider) && Date.now() - lastRefresh >= config.cricketInningsStateIntervalMs) {
-    const [states] = await Promise.all([
+    // All four calls below share the adapter's own cached `match_scorecard`
+    // fetch (see CricketDataAdapter's `getCachedMatchScorecard` doc
+    // comment) — this whole block costs at most one real extra request
+    // beyond `getFixtureDetail`'s `match_info` call, not four.
+    const [states, scorecard, roster] = await Promise.all([
       provider.getInningsState(fixtureId),
-      provider
-        .getFixtureDetail(fixtureId)
-        .then((detail) => detail && upsertCricketFixtureDetail(detail)),
+      provider.getScorecard(fixtureId),
+      provider.getRosterForFixture(fixtureId),
+      provider.getFixtureDetail(fixtureId).then((detail) => detail && upsertCricketFixtureDetail(detail)),
     ]);
+
+    await upsertCricketRoster(provider.sportId, roster.teams, roster.players);
+
     for (const state of states) {
       await upsertCricketInningsState(state);
     }
+    for (const innings of scorecard) {
+      if (!innings) continue;
+      for (const figure of innings.batting) await upsertCricketBattingFigure(figure);
+      for (const figure of innings.bowling) await upsertCricketBowlingFigure(figure);
+    }
+
     lastStateRefresh.set(fixtureId, Date.now());
     stateRefreshed = true;
   }

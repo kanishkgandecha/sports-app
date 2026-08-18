@@ -1,0 +1,164 @@
+/*
+ * Cricket Checkpoint 2 — extracted from f1EventCenter.module.css. StateView
+ * and GlossaryDrawer/EducationTrigger were already sport-agnostic in logic
+ * (ARCHITECTURE.md §2 places them above the live-data layer, below any
+ * sport skin) but had never had a real second sport to prove it — both
+ * imported f1EventCenter.module.css directly, which was fine when F1 was
+ * the only skin that existed but became a real cross-sport layering
+ * violation the moment Cricket needed the exact same drawer. This module
+ * holds only those genuinely shared classes, values unchanged from F1's
+ * module, so F1's rendering is byte-identical after the move. Sport skins
+ * (f1EventCenter.module.css, cricketEventCenter.module.css) keep their own
+ * sport-specific classes and must never be reached into from here or from
+ * each other.
+ */
+
+/* ---- state views (loading/empty/error) ----------------------------------- */
+
+.stateView {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  color: var(--color-text-faint);
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.stateViewError {
+  color: var(--color-negative);
+  border-color: color-mix(in srgb, var(--color-negative) 30%, var(--color-border));
+}
+
+/* ---- education ------------------------------------------------------------ */
+
+.educationTrigger {
+  font: inherit;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+
+.educationTrigger:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.educationTrigger:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 40;
+  animation: fadeIn var(--duration-base) var(--ease-standard);
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(360px, 100vw);
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5);
+  gap: var(--space-3);
+  overflow-y: auto;
+  animation: slideIn var(--duration-base) var(--ease-standard);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawerOverlay,
+  .drawer {
+    animation: none;
+  }
+}
+
+.drawerClose {
+  align-self: flex-end;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1);
+}
+
+.drawerClose:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.drawerTitle {
+  font-size: var(--font-size-lg);
+}
+
+.drawerBody {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+  white-space: pre-wrap;
+}
+
+.drawerRelated {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.drawerRelatedLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.drawerRelatedButton {
+  align-self: flex-start;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .drawer {
+    width: 100vw;
+  }
+}

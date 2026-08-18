@@ -291,3 +291,40 @@ model CricketInningsState {
 
   @@index([sessionId])
 }
+
+/// Cricket Checkpoint 2 — one row per batsman per innings. See
+/// @sports/domain's CricketBattingFigure doc comment for why this exists
+/// and why it's scoped exactly this way (no extras/totals — verified
+/// empty on every real scorecard captured).
+model CricketBattingFigure {
+  id            String @id @default(cuid())
+  sessionId     String
+  playerId      String
+  battingOrder  Int
+  runs          Int
+  balls         Int
+  fours         Int
+  sixes         Int
+  strikeRate    Float
+  dismissalText String
+
+  @@unique([sessionId, playerId])
+  @@index([sessionId, battingOrder])
+}
+
+/// One row per bowler per innings (aggregated across all their overs —
+/// matches the real provider shape, one entry per bowler, not per over).
+model CricketBowlingFigure {
+  id            String @id @default(cuid())
+  sessionId     String
+  playerId      String
+  bowlingOrder  Int
+  overs         Float
+  maidens       Int
+  runsConceded  Int
+  wickets       Int
+  economy       Float
+
+  @@unique([sessionId, playerId])
+  @@index([sessionId, bowlingOrder])
+}

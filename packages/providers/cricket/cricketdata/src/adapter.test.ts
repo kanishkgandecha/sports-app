@@ -201,6 +201,60 @@ describe("CricketDataAdapter — Cricket-specific behavior, offline via FixtureC
     expect(detail?.format).toBe("T20");
     expect(detail?.tossDecision).toBe("BOWL");
   });
+
+  it("getScorecard normalizes real batting/bowling figures for a match with a real scorecard", async () => {
+    const adapter = makeAdapter();
+    const scorecard = await adapter.getScorecard(`cricket-match-${SCORECARD_AVAILABLE_ID}`);
+    expect(scorecard).toHaveLength(1); // this real match's score[] has exactly 1 real entry
+    expect(scorecard[0]).toBeDefined();
+    expect(scorecard[0]!.batting.length).toBeGreaterThan(0);
+    expect(scorecard[0]!.bowling.length).toBeGreaterThan(0);
+  });
+
+  it("getScorecard returns undefined per-innings (not []) for a match with no real scorecard available — honestly distinguishing 'nothing to show' from 'we checked, there's none'", async () => {
+    const adapter = makeAdapter();
+    const scorecard = await adapter.getScorecard(`cricket-match-${INNINGS_BREAK_ID}`);
+    expect(scorecard.every((s) => s === undefined)).toBe(true);
+  });
+
+  it("getRosterForFixture resolves real, named teams/players for a fixture with a real scorecard, reusing the cached call", async () => {
+    let scorecardCalls = 0;
+    class CountingClient extends FixtureCricketDataClient {
+      async getMatchScorecard(matchId: string) {
+        scorecardCalls += 1;
+        return super.getMatchScorecard(matchId);
+      }
+    }
+    const adapter = new CricketDataAdapter({ client: new CountingClient() });
+    const fixtureId = `cricket-match-${SCORECARD_AVAILABLE_ID}`;
+    await adapter.getInningsState(fixtureId); // primes the cache
+    const roster = await adapter.getRosterForFixture(fixtureId);
+    expect(roster.teams.length).toBeGreaterThan(0);
+    expect(roster.players.find((p) => p.name === "Janet Mbabazi")).toBeDefined();
+    expect(scorecardCalls).toBe(1);
+  });
+
+  it("getRosterForFixture returns real teams but no players when no scorecard is available", async () => {
+    const adapter = makeAdapter();
+    const roster = await adapter.getRosterForFixture(`cricket-match-${INNINGS_BREAK_ID}`);
+    expect(roster.teams.length).toBeGreaterThan(0);
+    expect(roster.players).toEqual([]);
+  });
+
+  it("shares one real match_scorecard call between getInningsState and getScorecard in the same tick — the real caching fix that keeps Checkpoint 2's new method from doubling real requests", async () => {
+    let scorecardCalls = 0;
+    class CountingClient extends FixtureCricketDataClient {
+      async getMatchScorecard(matchId: string) {
+        scorecardCalls += 1;
+        return super.getMatchScorecard(matchId);
+      }
+    }
+    const adapter = new CricketDataAdapter({ client: new CountingClient() });
+    const fixtureId = `cricket-match-${SCORECARD_AVAILABLE_ID}`;
+    await adapter.getInningsState(fixtureId);
+    await adapter.getScorecard(fixtureId);
+    expect(scorecardCalls).toBe(1);
+  });
 });
 
 describe("CricketDataAdapter — error handling passthrough", () => {

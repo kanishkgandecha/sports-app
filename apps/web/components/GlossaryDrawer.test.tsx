@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GlossaryDrawer } from "./GlossaryDrawer";
-import { apiGet } from "../../../lib/api";
+import { apiGet } from "../lib/api";
 
-vi.mock("../../../lib/api", () => ({ apiGet: vi.fn() }));
+vi.mock("../lib/api", () => ({ apiGet: vi.fn() }));
 const mockApiGet = vi.mocked(apiGet);
 
 const SAFETY_CAR_RESPONSE = {

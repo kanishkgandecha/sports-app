@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GlossaryDrawer } from "../../components/event-center/f1/GlossaryDrawer";
+import { GlossaryDrawer } from "../../components/GlossaryDrawer";
 import styles from "./page.module.css";
 
 interface ConceptSummary {

@@ -13,14 +13,15 @@ import type {
 import type { cricket } from "@sports/domain";
 import { BaseProviderAdapter, type RequestLogger, type SportsProvider } from "@sports/providers-core";
 import { CricketDataFetchClient, type CricketDataHttpClient } from "./client";
-import { CRICKET_SPORT_ID, buildCompetitionId, buildFixtureId, buildTeamId, fixtureRefFromId, sessionRefFromId } from "./reference";
+import { CRICKET_SPORT_ID, buildCompetitionId, buildFixtureId, buildSessionId, buildTeamId, fixtureRefFromId, sessionRefFromId } from "./reference";
 import { normalizeCompetition, normalizeSeason } from "./normalize/competition";
 import { deriveFixtureStatus, normalizeFixture, normalizeFixtureDetail, normalizeVenue } from "./normalize/fixture";
 import { normalizeTeams } from "./normalize/team";
 import { normalizePlayersFromScorecard } from "./normalize/player";
 import { deriveInningsTeamOrder, normalizeInningsState, normalizeSessions } from "./normalize/innings";
 import { diffInningsScore, diffMatchStatus, normalizeBalls } from "./normalize/events";
-import type { CricketDataMatchSummary, CricketDataScoreEntry } from "./types";
+import { normalizeBattingFigures, normalizeBowlingFigures } from "./normalize/scorecard";
+import type { CricketDataMatchSummary, CricketDataScoreEntry, CricketDataScorecardResponse } from "./types";
 
 /**
  * CricketData.org-backed `SportsProvider` (Cricket Checkpoint 1 —
@@ -74,6 +75,19 @@ export class CricketDataAdapter extends BaseProviderAdapter implements SportsPro
   /** TTL cache for `getCurrentMatches()` — see `getCachedCurrentMatches`'s doc comment. */
   private currentMatchesCache: { fetchedAt: number; response: Awaited<ReturnType<CricketDataHttpClient["getCurrentMatches"]>> } | undefined;
   private static readonly CURRENT_MATCHES_TTL_MS = 5 * 60 * 1000;
+
+  /**
+   * TTL cache for `getMatchScorecard(matchId)` — Checkpoint 2 introduced a
+   * second real caller of the same real `match_scorecard` request
+   * (`getScorecard`, alongside `getInningsState`'s existing one), both
+   * typically called back-to-back in the same ingestion tick (see
+   * `apps/ingestion/src/cricket/job.ts`'s state-refresh step) — same
+   * "don't double a real call the caller already paid for" reasoning as
+   * `getCachedCurrentMatches`, keyed per match since (unlike
+   * `currentMatches`) this is match-specific data.
+   */
+  private readonly matchScorecardCache = new Map<string, { fetchedAt: number; response: CricketDataScorecardResponse }>();
+  private static readonly MATCH_SCORECARD_TTL_MS = 5 * 60 * 1000;
 
   constructor(options: { client?: CricketDataHttpClient; apiKey?: string; onRequest?: RequestLogger; maxSeriesLookups?: number } = {}) {
     super(options.onRequest);
@@ -202,7 +216,7 @@ export class CricketDataAdapter extends BaseProviderAdapter implements SportsPro
 
     const players: Player[] = [];
     for (const match of candidates) {
-      const scorecard = await this.client.getMatchScorecard(match.id).catch(() => undefined);
+      const scorecard = await this.getCachedMatchScorecard(match.id, "getPlayers");
       if (!scorecard || scorecard.status !== "success" || !scorecard.data) continue;
       const order = deriveInningsTeamOrder(match, buildTeamId);
       scorecard.data.scorecard.forEach((block, i) => {
@@ -279,7 +293,7 @@ export class CricketDataAdapter extends BaseProviderAdapter implements SportsPro
     if (!match || !match.score) return [];
 
     const order = deriveInningsTeamOrder(match, buildTeamId);
-    const scorecard = await this.client.getMatchScorecard(matchId).catch(() => undefined);
+    const scorecard = await this.getCachedMatchScorecard(matchId, "getInningsState");
     const blocks = scorecard?.status === "success" ? scorecard.data?.scorecard : undefined;
 
     const states: cricket.CricketInningsState[] = [];
@@ -288,6 +302,72 @@ export class CricketDataAdapter extends BaseProviderAdapter implements SportsPro
       if (state) states.push(state);
     }
     return states;
+  }
+
+  /**
+   * Bonus method (not part of `SportsProvider`) — Checkpoint 2's batting
+   * scorecard/bowling figures. Deliberately per-innings (one entry per
+   * real `score[]` index, matching `getInningsState`'s own indexing) —
+   * `undefined` for an innings the real scorecard doesn't have a block
+   * for (verified real: `match_scorecard` can be entirely unavailable for
+   * a match that IS live — see types.ts), never a fabricated empty list
+   * presented as "we checked, there's nothing."
+   */
+  async getScorecard(
+    fixtureId: string,
+  ): Promise<Array<{ sessionId: string; batting: cricket.CricketBattingFigure[]; bowling: cricket.CricketBowlingFigure[] } | undefined>> {
+    const matchId = fixtureRefFromId(fixtureId);
+    const match = await this.fetchMatchInfo(matchId, "getScorecard");
+    if (!match || !match.score) return [];
+
+    const scorecard = await this.getCachedMatchScorecard(matchId, "getScorecard");
+    const blocks = scorecard?.status === "success" ? scorecard.data?.scorecard : undefined;
+
+    return match.score.map((_entry, i) => {
+      const block = blocks?.[i];
+      if (!block) return undefined;
+      const sessionId = buildSessionId(matchId, i + 1);
+      return {
+        sessionId,
+        batting: normalizeBattingFigures(block, sessionId),
+        bowling: normalizeBowlingFigures(block, sessionId),
+      };
+    });
+  }
+
+  /**
+   * Bonus method (not part of `SportsProvider`) — Checkpoint 2's real gap
+   * closer: `getScorecard`'s figures carry only `playerId`, and nothing in
+   * the Cricket ingestion pipeline otherwise persists real `Player` rows
+   * (found while wiring up the API/UI — `getPlayers()` above is a
+   * separate, batch-oriented, budget-capped method never actually called
+   * by the per-fixture job tick). Reuses the SAME cached
+   * `match_scorecard` fetch `getInningsState`/`getScorecard` already made
+   * this tick — no extra real request — to return real, named `Team`/
+   * `Player` rows for exactly the players who appear in this fixture's
+   * scorecard, so the API can join real names the same way
+   * `apps/api/src/routes/f1.ts`'s `driversById` already does for F1.
+   */
+  async getRosterForFixture(fixtureId: string): Promise<{ teams: Team[]; players: Player[] }> {
+    const matchId = fixtureRefFromId(fixtureId);
+    const match = await this.fetchMatchInfo(matchId, "getRosterForFixture");
+    if (!match) return { teams: [], players: [] };
+
+    const scorecard = await this.getCachedMatchScorecard(matchId, "getRosterForFixture");
+    const blocks = scorecard?.status === "success" ? scorecard.data?.scorecard : undefined;
+    const order = deriveInningsTeamOrder(match, buildTeamId);
+
+    const players: Player[] = [];
+    (blocks ?? []).forEach((block, i) => {
+      const teams = order[i];
+      if (teams) players.push(...normalizePlayersFromScorecard(block, teams));
+    });
+
+    const seen = new Set<string>();
+    return {
+      teams: normalizeTeams(match),
+      players: players.filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true))),
+    };
   }
 
   /** Bonus method (not part of `SportsProvider`) — per-fixture toss/format/result. */
@@ -302,6 +382,21 @@ export class CricketDataAdapter extends BaseProviderAdapter implements SportsPro
     try {
       const response = await this.timed(method, () => this.client.getMatchInfo(matchId));
       return response.status === "success" ? response.data : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async getCachedMatchScorecard(matchId: string, method: string): Promise<CricketDataScorecardResponse | undefined> {
+    const now = Date.now();
+    const cached = this.matchScorecardCache.get(matchId);
+    if (cached && now - cached.fetchedAt < CricketDataAdapter.MATCH_SCORECARD_TTL_MS) {
+      return cached.response;
+    }
+    try {
+      const response = await this.timed(method, () => this.client.getMatchScorecard(matchId));
+      this.matchScorecardCache.set(matchId, { fetchedAt: now, response });
+      return response;
     } catch {
       return undefined;
     }

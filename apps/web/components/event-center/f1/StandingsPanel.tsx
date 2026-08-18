@@ -8,7 +8,7 @@ import {
   type F1DriverStanding,
 } from "../../../lib/f1Api";
 import { StateView } from "../StateView";
-import { EducationTrigger } from "./GlossaryDrawer";
+import { EducationTrigger } from "../../GlossaryDrawer";
 import styles from "./f1EventCenter.module.css";
 
 interface ListState<T> {

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { apiGet } from "../../../lib/api";
-import styles from "./f1EventCenter.module.css";
+import { apiGet } from "../lib/api";
+import styles from "./sharedEventCenter.module.css";
 
 interface ConceptDetail {
   concept: { slug: string; title: string; detailExplanation: string };
@@ -12,12 +12,18 @@ interface ConceptDetail {
 }
 
 /**
- * The one drawer instance the whole Event Center shares — opened with a
- * concept slug from anywhere (the "New to F1?" entry point, a race-control
- * message's "What does this mean?" chip). Dismissible (Esc, overlay click,
- * close button), never blocks the live view underneath it, and never
- * auto-opens (Checkpoint 5 §12 — education must never interrupt someone who
- * already understands F1).
+ * The one drawer instance any Event Center shares — opened with a concept
+ * slug from anywhere (an "Explain this" entry point, a live-feed message's
+ * "What does this mean?" chip). Dismissible (Esc, overlay click, close
+ * button), never blocks the live view underneath it, and never auto-opens
+ * (Checkpoint 5 §12 — education must never interrupt someone who already
+ * understands the sport).
+ *
+ * Moved here from event-center/f1/ in Cricket Checkpoint 2 — this was
+ * already sport-agnostic in logic (ARCHITECTURE.md §2's education layer
+ * sits above live-data, below any sport skin), it just had nowhere else to
+ * live until a second sport actually needed it. Styles moved with it into
+ * sharedEventCenter.module.css, unchanged, so F1's rendering is identical.
  */
 export function GlossaryDrawer({ slug, onClose, onNavigate }: { slug: string; onClose: () => void; onNavigate: (slug: string) => void }) {
   const [data, setData] = useState<ConceptDetail | null>(null);

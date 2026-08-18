@@ -13,7 +13,7 @@ import {
   type F1TimingRow,
 } from "../../../lib/f1Api";
 import { FreshnessIndicator } from "../../FreshnessIndicator";
-import { EducationTrigger, GlossaryDrawer } from "./GlossaryDrawer";
+import { EducationTrigger, GlossaryDrawer } from "../../GlossaryDrawer";
 import { SessionSelector } from "./SessionSelector";
 import { TimingTower } from "./TimingTower";
 import { RaceControlFeed } from "./RaceControlFeed";

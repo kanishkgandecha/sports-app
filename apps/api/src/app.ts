@@ -4,6 +4,7 @@ import { sportsRoutes } from "./routes/sports.js";
 import { educationRoutes } from "./routes/education.js";
 import { liveRoutes } from "./routes/live.js";
 import { f1Routes } from "./routes/f1.js";
+import { cricketRoutes } from "./routes/cricket.js";
 import { LiveEventBus } from "./liveEventBus.js";
 
 export async function buildApp(databaseUrl: string) {
@@ -18,6 +19,7 @@ export async function buildApp(databaseUrl: string) {
   await app.register(sportsRoutes);
   await app.register(educationRoutes);
   await app.register(f1Routes);
+  await app.register(cricketRoutes);
   await app.register((instance) => liveRoutes(instance, bus));
 
   app.addHook("onClose", async () => {
