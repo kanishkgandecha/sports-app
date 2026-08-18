@@ -3,12 +3,13 @@ import { bootstrapFromProvider } from "./bootstrapSynthetic.js";
 import { publishLiveEvent } from "./publish.js";
 import { config } from "./config";
 import { logger } from "./logger";
-import { resolveF1Provider, resolveF1StandingsProvider } from "./providers/registry";
+import { resolveF1Provider, resolveF1StandingsProvider, resolveCricketProvider } from "./providers/registry";
 import { runF1Job } from "./f1/job";
 import { runF1StandingsJob } from "./f1/standingsJob";
+import { runCricketJob } from "./cricket/job";
 
 /**
- * Two independent jobs run in this one process, selected by configuration
+ * Independent jobs run in this one process, selected by configuration
  * (docs/CONTEXT.md §9 "Architecture") — not a single hardcoded provider:
  *
  * 1. The Phase 0 synthetic health-check job — UNCHANGED from Checkpoint 3.
@@ -20,6 +21,11 @@ import { runF1StandingsJob } from "./f1/standingsJob";
  *    own interval, using Jolpica-F1 rather than the live-data provider
  *    (OpenF1). See apps/ingestion/src/f1/standingsJob.ts and
  *    docs/CONTEXT.md Checkpoint 6 §4.
+ * 4. The Cricket job (Phase 2 Checkpoint 1, new) — current-matches
+ *    bootstrap, then active-innings polling, using CricketData.org (the
+ *    approved development provider). Disabled by default, unlike every F1
+ *    job — see config.ts's `cricketProvider` doc comment for why (a real,
+ *    confirmed 100 req/day rate limit). See apps/ingestion/src/cricket/job.ts.
  */
 async function runSyntheticJob() {
   const provider = new FakeSportsProvider();
@@ -63,6 +69,18 @@ async function main() {
     // (standingsJob.ts) and must never take down the other jobs.
     runF1StandingsJob(f1StandingsProvider, config.f1StandingsSeasons).catch((error) => {
       logger.error({ error: error instanceof Error ? error.message : String(error) }, "F1 standings job crashed");
+    });
+  }
+
+  const cricketProvider = resolveCricketProvider();
+  if (cricketProvider) {
+    logger.info({ provider: cricketProvider.id }, "starting Cricket job");
+    // Not awaited, same reasoning as the F1/standings jobs above — runs
+    // for the life of the process on its own interval; a failed tick is
+    // caught internally (cricket/job.ts) and must never take down the
+    // other jobs.
+    runCricketJob(cricketProvider).catch((error) => {
+      logger.error({ error: error instanceof Error ? error.message : String(error) }, "Cricket job crashed");
     });
   }
 }

@@ -69,6 +69,9 @@ importers:
       '@sports/providers-core':
         specifier: workspace:*
         version: link:../../packages/providers/core
+      '@sports/providers-cricket-cricketdata':
+        specifier: workspace:*
+        version: link:../../packages/providers/cricket/cricketdata
       '@sports/providers-f1-jolpica':
         specifier: workspace:*
         version: link:../../packages/providers/f1/jolpica
@@ -216,6 +219,25 @@ importers:
         specifier: workspace:*
         version: link:../../domain
     devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
+
+  packages/providers/cricket/cricketdata:
+    dependencies:
+      '@sports/domain':
+        specifier: workspace:*
+        version: link:../../../domain
+      '@sports/providers-core':
+        specifier: workspace:*
+        version: link:../../core
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.13.3
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

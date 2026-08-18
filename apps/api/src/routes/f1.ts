@@ -291,7 +291,11 @@ function toFixtureSummary(fixture: {
   name: string;
   status: string;
   startTime: Date;
-  venue: { id: string; name: string; country: string; timezone: string } | null;
+  // country nullable since Cricket Checkpoint 1 — see @sports/domain's
+  // Venue doc comment. F1 rows are unaffected in practice (OpenF1 always
+  // populates a real value); the type just now reflects what the shared
+  // core Venue model honestly allows.
+  venue: { id: string; name: string; country: string | null; timezone: string } | null;
 }) {
   return {
     id: fixture.id,

@@ -62,9 +62,12 @@ model Season {
 }
 
 model Venue {
-  id       String @id @default(cuid())
-  name     String
-  country  String
+  id      String  @id @default(cuid())
+  name    String
+  /// Nullable since Cricket Checkpoint 1 — see @sports/domain's Venue doc
+  /// comment. CricketData.org gives no separate country field; F1 rows
+  /// are unaffected (OpenF1Adapter always populates a real value).
+  country String?
   timezone String
 
   fixtures Fixture[]
@@ -238,4 +241,53 @@ model RaceControlMessage {
   message   String
 
   @@index([sessionId, timestamp])
+}
+
+// ---------------------------------------------------------------------------
+// Cricket extension (Phase 2, Checkpoint 1) — see ARCHITECTURE.md §5 and
+// docs/CONTEXT.md's Cricket domain proposal (Checkpoint 7 §8) and this
+// checkpoint's implementation notes. Same no-FK-constraint pattern as the F1
+// extension above (DriverTiming/PitStop/RaceControlMessage): plain indexed
+// id columns, not `@relation` fields — a Phase 0/Checkpoint 2 schema
+// characteristic kept consistent here rather than introduced ad hoc.
+// ---------------------------------------------------------------------------
+
+/// One row per Fixture (= match). Cricket-only facts a Fixture has no slot
+/// for — see the doc comment on @sports/domain's CricketFixtureDetail for
+/// why exactly these fields and no more.
+model CricketFixtureDetail {
+  id              String  @id @default(cuid())
+  fixtureId       String  @unique
+  /// Nullable — verified real: CricketData.org's own `matchType` is
+  /// genuinely absent on some real matches. See @sports/domain's
+  /// CricketFixtureDetail doc comment for the fallback heuristic.
+  format          String? // "TEST" | "ODI" | "T20" | null
+  tossWonByTeamId String?
+  tossDecision    String? // "BAT" | "BOWL"
+  result          String?
+
+  @@index([fixtureId])
+}
+
+/// One row per Session (= innings) — current-state snapshot, the cricket
+/// equivalent of DriverTiming. Upserted in place; never replayed from
+/// LiveEvent to answer "what's the score right now."
+model CricketInningsState {
+  id               String  @id @default(cuid())
+  sessionId        String  @unique
+  battingTeamId    String
+  bowlingTeamId    String
+  runs             Int
+  wickets          Int
+  /// Decimal overs, e.g. 14.3 — matches the provider's own `o` field format.
+  overs            Float
+  strikerId        String?
+  nonStrikerId     String?
+  currentBowlerId  String?
+  /// Derived (first innings total + 1), not read from the provider — see
+  /// @sports/domain's CricketInningsState doc comment.
+  target           Int?
+  requiredRunRate  Float?
+
+  @@index([sessionId])
 }

@@ -1,0 +1,60 @@
+{
+  "apikey": "REDACTED",
+  "data": {
+    "id": "e9d200fb-3c43-4852-9c93-9160517d7b36",
+    "name": "Chepauk Super Gillies vs Vida Kovai Kings, 21st Match, Tamil Nadu Premier League 2026",
+    "matchType": "t20",
+    "status": "Vida Kovai Kings need 163 runs",
+    "venue": "MA Chidambaram Stadium, Chennai",
+    "date": "2026-08-18",
+    "dateTimeGMT": "2026-08-18T14:00:00",
+    "teams": [
+      "Chepauk Super Gillies",
+      "Vida Kovai Kings"
+    ],
+    "teamInfo": [
+      {
+        "name": "Chepauk Super Gillies",
+        "shortname": "CSG",
+        "img": "https://g.cricapi.com/iapi/136-637957472174708637.webp?w=48"
+      },
+      {
+        "name": "Vida Kovai Kings",
+        "img": "https://h.cricapi.com/img/icon512.png"
+      }
+    ],
+    "score": [
+      {
+        "r": 167,
+        "w": 10,
+        "o": 19.3,
+        "inning": "Chepauk Super Gillies Inning 1"
+      },
+      {
+        "r": 5,
+        "w": 0,
+        "o": 0.3,
+        "inning": "Vida Kovai Kings Inning 1"
+      }
+    ],
+    "tossWinner": "vida kovai kings",
+    "tossChoice": "bowl",
+    "series_id": "6c3c5876-5cfc-4490-9c8e-8ba90aec4323",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": true,
+    "matchEnded": false
+  },
+  "status": "success",
+  "info": {
+    "hitsToday": 14,
+    "hitsUsed": 1,
+    "hitsLimit": 100,
+    "credits": 0,
+    "server": 4,
+    "queryTime": 723.6828,
+    "s": 0,
+    "cache": 0
+  }
+}

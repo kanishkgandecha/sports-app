@@ -1,0 +1,42 @@
+{
+  "_provenance": "CONSTRUCTED, NOT a real captured response — see fixtures/README.md. No real match sampled this checkpoint had bbbEnabled:true, so no real match_bbb success payload could be captured (see types.ts's CricketDataBallByBallResponse doc comment). This exercises normalizeBalls' happy-path parsing against the ASSUMED shape only; the real, verified behavior is matchBbb.notFound.json.",
+  "apikey": "REDACTED",
+  "status": "success",
+  "data": {
+    "id": "e9d200fb-3c43-4852-9c93-9160517d7b36",
+    "bbb": [
+      {
+        "inning": "Vida Kovai Kings Inning 1",
+        "overs": [
+          {
+            "over": 0,
+            "ball": 1,
+            "batsman": { "id": "f6cc2815-be88-4e14-8951-ba9c86ad4572", "name": "Janet Mbabazi", "cricbuzz_id": "13839" },
+            "bowler": { "id": "0490410f-92de-43e4-8da8-2d07de8f1fbd", "name": "Agnes Qwele", "cricbuzz_id": "36263" },
+            "runs": 1
+          },
+          {
+            "over": 0,
+            "ball": 2,
+            "batsman": { "id": "8ef46d4e-e7c8-4a87-be31-4689f42b8301", "name": "Stephani Nampiina", "cricbuzz_id": "13849" },
+            "bowler": { "id": "0490410f-92de-43e4-8da8-2d07de8f1fbd", "name": "Agnes Qwele", "cricbuzz_id": "36263" },
+            "runs": 0,
+            "wicket": {
+              "type": "bowled",
+              "player": { "id": "8ef46d4e-e7c8-4a87-be31-4689f42b8301", "name": "Stephani Nampiina", "cricbuzz_id": "13849" }
+            }
+          },
+          {
+            "over": 0,
+            "ball": 3,
+            "batsman": { "id": "ab3d3479-6db8-4c62-861b-19df739563c7", "name": "Prosscovia Alako", "cricbuzz_id": "35731" },
+            "bowler": { "id": "0490410f-92de-43e4-8da8-2d07de8f1fbd", "name": "Agnes Qwele", "cricbuzz_id": "36263" },
+            "runs": 4,
+            "extra_type": "wide",
+            "extra_runs": 1
+          }
+        ]
+      }
+    ]
+  }
+}

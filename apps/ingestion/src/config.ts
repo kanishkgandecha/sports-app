@@ -87,4 +87,53 @@ export const config = {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
+
+  /**
+   * Cricket Checkpoint 1. Deliberately defaults to **"disabled"**, unlike
+   * every F1 provider default — CricketData.org's real, confirmed rate
+   * limit is 100 requests/**day** (verified via the API's own real
+   * response metadata, not just docs — see `packages/providers/cricket/
+   * cricketdata/src/client.ts`'s doc comment), a scarce resource this
+   * checkpoint won't spend by default just because ingestion started.
+   * Requires explicit opt-in: `CRICKET_PROVIDER=cricketdata` AND a real
+   * `CRICKETDATA_API_KEY`.
+   */
+  cricketProvider: process.env.CRICKET_PROVIDER ?? "disabled",
+  cricketDataApiKey: process.env.CRICKETDATA_API_KEY ?? "",
+
+  /**
+   * How often the Cricket job re-fetches `currentMatches` and polls active
+   * sessions. Real math against the confirmed 100/day cap: one tick calls
+   * `getCurrentMatches` once (cached — see the adapter's
+   * `getCachedCurrentMatches`) plus one `match_info` call per currently-
+   * live session. Even a single live match polled every 20 minutes is
+   * 72 `match_info` calls/day alone — 30 minutes (this default) keeps a
+   * single live match comfortably under half the daily budget, leaving
+   * headroom for `getInningsState`'s extra `match_scorecard` call (see
+   * `cricketInningsStateIntervalMs`) and normal development/testing
+   * activity sharing the same key. Independently configurable — a
+   * production deployment with its own dedicated key (and likely
+   * Sportmonks Cricket, not this dev-tier provider — see docs/CONTEXT.md,
+   * Checkpoint 7 §7) would tune this down.
+   */
+  cricketPollIntervalMs: Number(process.env.CRICKET_POLL_INTERVAL_MS ?? 30 * 60 * 1000),
+
+  /**
+   * How often `getInningsState` (striker/non-striker/current bowler — an
+   * extra real `match_scorecard` call per live session, on top of
+   * `cricketPollIntervalMs`'s `match_info` call) refreshes. Slower than
+   * the base poll interval on purpose — this is enrichment, not the
+   * core score/wicket signal, which `pollLiveEvents` already keeps fresh
+   * every tick from `match_info` alone.
+   */
+  cricketInningsStateIntervalMs: Number(process.env.CRICKET_INNINGS_STATE_INTERVAL_MS ?? 60 * 60 * 1000),
+
+  /**
+   * Safety cap for a cricket session (one innings) with no known end
+   * time. Much larger than F1's 4 hours — a real Test innings can run
+   * most of a full day's play. 12 hours comfortably covers even a long
+   * rain-delayed innings without ever treating a genuinely-finished one
+   * as still live indefinitely.
+   */
+  cricketMaxSessionDurationMs: Number(process.env.CRICKET_MAX_SESSION_DURATION_MS ?? 12 * 60 * 60 * 1000),
 };

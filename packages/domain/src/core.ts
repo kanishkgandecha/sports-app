@@ -44,7 +44,19 @@ export interface Season {
 export interface Venue {
   id: string;
   name: string;
-  country: string;
+  /**
+   * Nullable since Cricket Checkpoint 1 (docs/CONTEXT.md) — the one core-
+   * model change that checkpoint made, and the only field relaxed: F1's
+   * OpenF1 always gives a real country per venue, but CricketData.org
+   * gives only a single free-text "ground, city" string (e.g. "MA
+   * Chidambaram Stadium, Chennai") with no separate country field at all —
+   * verified against real match data, not assumed. Guessing a country
+   * from a city name would need an external geo lookup this checkpoint
+   * doesn't have and shouldn't fabricate; storing `null` is the honest
+   * representation. F1 rows are unaffected — OpenF1Adapter still always
+   * populates a real value.
+   */
+  country: string | null;
   timezone: string;
 }
 
