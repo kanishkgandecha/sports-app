@@ -36,6 +36,14 @@ export function sportsProviderContractTests(makeProvider: () => SportsProvider) 
       expect(sessions.length).toBeGreaterThan(0);
     });
 
+    it("returns venues as an array (possibly empty) without throwing", async () => {
+      const provider = makeProvider();
+      const [competition] = await provider.getCompetitions();
+      const [season] = await provider.getSeasons({ competitionId: competition.id });
+      const venues = await provider.getVenues({ competitionId: competition.id, seasonId: season.id });
+      expect(Array.isArray(venues)).toBe(true);
+    });
+
     it("returns standings scoped to a season", async () => {
       const provider = makeProvider();
       const [competition] = await provider.getCompetitions();

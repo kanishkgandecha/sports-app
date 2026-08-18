@@ -7,18 +7,23 @@
     "dev": "tsx watch --env-file=../../.env src/index.ts",
     "build": "tsup src/index.ts --format cjs --clean",
     "start": "node --env-file=../../.env dist/index.cjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@sports/db": "workspace:*",
     "@sports/domain": "workspace:*",
     "@sports/providers-core": "workspace:*",
+    "@sports/providers-f1-openf1": "workspace:*",
     "pino": "^10.3.1"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.0",
     "tsup": "^8.5.1",
     "tsx": "^4.23.12",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   }
 }

@@ -104,6 +104,7 @@ export function normalizeRaceControlEvent(
     const payload = {
       category: classification.category,
       deployedLap: msg.lap_number,
+      message: msg.message,
     } satisfies f1.SafetyCarPayload;
     return { ...base, eventType: classification.eventType, payload } as LiveEvent;
   }

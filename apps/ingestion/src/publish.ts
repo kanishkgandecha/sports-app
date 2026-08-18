@@ -1,23 +1,47 @@
-import { prisma } from "@sports/db";
+import { Prisma, prisma } from "@sports/db";
 import type { LiveEvent } from "@sports/domain";
 
 /**
  * Writes a LiveEvent and notifies the API tier via Postgres NOTIFY, in one
- * place, so every ingestion job (synthetic today, F1/cricket/football/
- * esports later) publishes the same way — see ARCHITECTURE.md §4.
+ * place, so every ingestion job (synthetic, F1, and future sports)
+ * publishes the same way — see ARCHITECTURE.md §4.
+ *
+ * Idempotent by construction (changed at Checkpoint 4 — docs/CONTEXT.md §9
+ * "Idempotency"): real providers' adapters build deterministic ids (e.g.
+ * OpenF1Adapter's `openf1-lap-{session}-{driver}-{lap}`), so re-processing
+ * an overlapping poll window or replaying a cursor after a worker restart
+ * produces the exact same id. `create()` is attempted first; a unique-
+ * constraint violation (P2002) means this exact event was already recorded
+ * — treated as a successful no-op, `created: false`, not an error.
+ *
+ * Deliberately *not* a plain `upsert`: an upsert can't distinguish "just
+ * inserted" from "already existed," and calling `pg_notify` on a duplicate
+ * would re-broadcast an already-seen event to every SSE subscriber, which
+ * has no dedup logic of its own on the frontend. Only a genuine first
+ * insert notifies.
  */
-export async function publishLiveEvent(event: LiveEvent) {
-  await prisma.liveEvent.create({
-    data: {
-      id: event.id,
-      sportId: (await prisma.sport.findUniqueOrThrow({ where: { slug: event.sportId } })).id,
-      sessionId: event.sessionId,
-      eventType: event.eventType,
-      timestamp: new Date(event.timestamp),
-      source: event.source,
-      payload: event.payload as never,
-    },
-  });
+export async function publishLiveEvent(event: LiveEvent): Promise<{ created: boolean }> {
+  const sport = await prisma.sport.findUniqueOrThrow({ where: { slug: event.sportId } });
+
+  try {
+    await prisma.liveEvent.create({
+      data: {
+        id: event.id,
+        sportId: sport.id,
+        sessionId: event.sessionId,
+        eventType: event.eventType,
+        timestamp: new Date(event.timestamp),
+        source: event.source,
+        payload: event.payload as never,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { created: false }; // this exact event was already processed
+    }
+    throw error;
+  }
 
   await prisma.$executeRaw`SELECT pg_notify('live_events', ${JSON.stringify(event)})`;
+  return { created: true };
 }

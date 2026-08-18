@@ -45,7 +45,14 @@ export function normalizeMeeting(
     sportId: F1_SPORT_ID,
     competitionId: input.competitionId,
     seasonId: input.seasonId,
-    slug: `${slugify(meeting.meeting_name)}-${meeting.year}`,
+    // meeting_key suffix, not just name+year: real 2026 data has two
+    // "Pre-Season Testing" meetings and two "Bahrain Grand Prix" meetings
+    // (different meeting_key each) — meeting_name is not unique within a
+    // year. Found via a live smoke test at Checkpoint 4 (a Fixture_sportId
+    // _slug unique-constraint violation during bootstrap), not documentation
+    // — see docs/CONTEXT.md §9. Slightly less pretty as a URL slug; correct
+    // by construction instead of "usually correct."
+    slug: `${slugify(meeting.meeting_name)}-${meeting.year}-${meeting.meeting_key}`,
     name: meeting.meeting_name,
     status: deriveFixtureStatus(meeting, input.now ?? new Date()),
     startTime: meeting.date_start,

@@ -7,6 +7,7 @@ import type {
   Session,
   Standing,
   Team,
+  Venue,
 } from "@sports/domain";
 import type { SportsProvider } from "./types";
 
@@ -102,6 +103,11 @@ export class FakeSportsProvider implements SportsProvider {
 
   async getPlayers(): Promise<Player[]> {
     return [this.player];
+  }
+
+  /** The synthetic fixture has no venue (venueId: null) — nothing to return. */
+  async getVenues(): Promise<Venue[]> {
+    return [];
   }
 
   async getStandings(): Promise<Standing[]> {

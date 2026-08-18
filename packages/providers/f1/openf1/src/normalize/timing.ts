@@ -83,6 +83,21 @@ export function diffPosition(
   };
 }
 
+/**
+ * DriverTiming.position is a required (non-null) field, but neither laps,
+ * intervals, nor stints ever supply it — only the `/position` endpoint does.
+ * Missing from `getDriverTimingPatches` since Checkpoint 3; found while
+ * wiring ingestion's current-state upserts at Checkpoint 4 (docs/CONTEXT.md
+ * §9), since a DriverTiming row can't be created without it.
+ */
+export function positionTimingPatch(position: OpenF1Position, sessionId: string): DriverTimingPatch {
+  return {
+    sessionId,
+    driverId: buildDriverId(position.driver_number),
+    position: position.position,
+  };
+}
+
 export function intervalTimingPatch(interval: OpenF1Interval, sessionId: string): DriverTimingPatch {
   return {
     sessionId,

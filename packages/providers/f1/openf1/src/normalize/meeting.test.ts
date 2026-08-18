@@ -70,7 +70,7 @@ describe("normalizeMeeting", () => {
       sportId: "f1",
       competitionId: "f1-world-championship",
       seasonId: "f1-season-2024",
-      slug: "belgian-grand-prix-2024",
+      slug: "belgian-grand-prix-2024-1242", // meeting_key suffix — see the doc comment on normalizeMeeting
       name: "Belgian Grand Prix",
       status: "live",
       startTime: belgium2024.date_start,

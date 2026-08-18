@@ -8,6 +8,8 @@
 
 const BASE_URL = "https://api.openf1.org/v1";
 const DEFAULT_TIMEOUT_MS = 10_000;
+const DEFAULT_MAX_RETRIES = 2;
+const DEFAULT_RETRY_DELAY_MS = 1_500;
 
 export class OpenF1RequestError extends Error {
   constructor(
@@ -39,18 +41,49 @@ export interface OpenF1HttpClient {
 export interface OpenF1ClientOptions {
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  /**
+   * How many times to retry a 429 before giving up — added at Checkpoint 4
+   * after a live smoke test hit real rate limiting mid-bootstrap more than
+   * once, even after pacing the calendar bootstrap's own request rate (see
+   * docs/CONTEXT.md §9's rate-limit Problem/Solution entry). Retrying here,
+   * once, at the HTTP layer, benefits every caller — bootstrap, live
+   * polling, roster fetches — rather than each call site inventing its own
+   * recovery. Set to 0 in tests to keep them fast.
+   */
+  maxRetries?: number;
+  retryDelayMs?: number;
 }
 
 export class OpenF1FetchClient implements OpenF1HttpClient {
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
+  private readonly maxRetries: number;
+  private readonly retryDelayMs: number;
 
   constructor(options: OpenF1ClientOptions = {}) {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
   }
 
   async get<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T[]> {
+    let attempt = 0;
+    for (;;) {
+      try {
+        return await this.getOnce<T>(path, params);
+      } catch (error) {
+        const isRateLimit = error instanceof OpenF1RequestError && error.status === 429;
+        if (!isRateLimit || attempt >= this.maxRetries) throw error;
+        attempt += 1;
+        // Linear backoff (1x, 2x delay) — simple and sufficient for a
+        // handful of retries; this isn't a queueing system.
+        await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs * attempt));
+      }
+    }
+  }
+
+  private async getOnce<T>(path: string, params: Record<string, string | number | undefined>): Promise<T[]> {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined) query.set(key, String(value));

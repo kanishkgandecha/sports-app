@@ -8,6 +8,7 @@ import type {
   Session,
   Standing,
   Team,
+  Venue,
 } from "@sports/domain";
 
 /**
@@ -33,6 +34,16 @@ export interface SportsProvider {
   getTeams(input?: { competitionId?: string }): Promise<Team[]>;
   getPlayers(input?: { teamId?: string }): Promise<Player[]>;
   getStandings(input: { seasonId: string }): Promise<Standing[]>;
+  /**
+   * Added at Checkpoint 4 (docs/CONTEXT.md §9) — flagged as a gap at
+   * Checkpoint 3 (`OpenF1Adapter.getVenuesForSeason` existed only as a
+   * bonus method outside this interface) and resolved once ingestion
+   * actually needed it: a Fixture's `venueId` has to reference a real Venue
+   * row, and only the provider knows what venues its fixtures use. Every
+   * sport has venues eventually, not just F1 — this belongs on the shared
+   * interface, not as an F1-specific escape hatch.
+   */
+  getVenues(input?: { competitionId?: string; seasonId?: string }): Promise<Venue[]>;
 
   /**
    * Pull live events for a session that occurred since `since` (an opaque

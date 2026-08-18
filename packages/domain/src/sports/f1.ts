@@ -87,6 +87,16 @@ export interface FastestLapPayload {
 export interface SafetyCarPayload {
   category: "safety_car" | "vsc" | "red_flag";
   deployedLap: number | null;
+  /**
+   * The original race-control message text (e.g. "SAFETY CAR DEPLOYED",
+   * "SAFETY CAR IN THIS LAP", "VIRTUAL SAFETY CAR ENDING", "RED FLAG").
+   * Missing since Checkpoint 3, inconsistent with FlagPayload/
+   * SessionStatusPayload which both carry it — found while deriving
+   * `RaceControlMessage.message` rows from LiveEvents at Checkpoint 4
+   * (docs/CONTEXT.md §9), since that derivation has no other access to the
+   * raw provider text.
+   */
+  message: string;
 }
 
 /** category="Flag" race control messages that aren't Safety Car/VSC/Red Flag — ordinary yellow/double-yellow/green/chequered. */

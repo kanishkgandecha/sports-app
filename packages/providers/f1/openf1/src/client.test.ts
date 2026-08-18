@@ -33,10 +33,33 @@ describe("OpenF1FetchClient", () => {
     await expect(client.get("/meetings")).rejects.toThrow(OpenF1RequestError);
   });
 
-  it("throws OpenF1RequestError with status on a 429 rate limit", async () => {
+  it("throws OpenF1RequestError with status on a 429 that persists through every retry", async () => {
     const fetchImpl = fakeFetch(() => new Response("", { status: 429 }));
-    const client = new OpenF1FetchClient({ fetchImpl });
+    const client = new OpenF1FetchClient({ fetchImpl, maxRetries: 1, retryDelayMs: 0 });
     await expect(client.get("/meetings")).rejects.toMatchObject({ status: 429 });
+  });
+
+  it("retries a 429 and succeeds once the rate limit clears — the exact scenario a live smoke test hit at Checkpoint 4", async () => {
+    let calls = 0;
+    const fetchImpl = fakeFetch(() => {
+      calls += 1;
+      return calls === 1 ? new Response("", { status: 429 }) : jsonResponse([{ ok: true }]);
+    });
+    const client = new OpenF1FetchClient({ fetchImpl, maxRetries: 2, retryDelayMs: 0 });
+    const result = await client.get("/meetings");
+    expect(result).toEqual([{ ok: true }]);
+    expect(calls).toBe(2);
+  });
+
+  it("does not retry a non-429 error at all", async () => {
+    let calls = 0;
+    const fetchImpl = fakeFetch(() => {
+      calls += 1;
+      return new Response("Internal Server Error", { status: 500 });
+    });
+    const client = new OpenF1FetchClient({ fetchImpl, maxRetries: 2, retryDelayMs: 0 });
+    await expect(client.get("/meetings")).rejects.toThrow(OpenF1RequestError);
+    expect(calls).toBe(1);
   });
 
   it("throws OpenF1RequestError on malformed JSON rather than crashing the process", async () => {

@@ -8,6 +8,7 @@ import type {
   Session,
   Standing,
   Team,
+  Venue,
 } from "@sports/domain";
 import { BaseProviderAdapter, type RequestLogger, type SportsProvider } from "@sports/providers-core";
 import { OpenF1FetchClient, type OpenF1HttpClient } from "./client";
@@ -31,6 +32,7 @@ import {
   normalizeLap,
   normalizePitStop,
   normalizeStint,
+  positionTimingPatch,
 } from "./normalize/timing";
 import { normalizeChampionshipEntry } from "./normalize/standing";
 import type {
@@ -47,18 +49,17 @@ import type {
 } from "./types";
 
 /**
- * OpenF1-backed `SportsProvider` (Checkpoint 3 — see docs/CONTEXT.md §8).
+ * OpenF1-backed `SportsProvider` (Checkpoint 3 — see docs/CONTEXT.md §8;
+ * `getVenues` added to the shared interface at Checkpoint 4 §9, resolving a
+ * gap flagged but left open in Checkpoint 3).
  *
- * Two capabilities the shared `SportsProvider` interface doesn't naturally
- * fit, both documented in CONTEXT.md rather than silently worked around:
- *
- * 1. No `getVenues()` on the interface at all — Venue normalization exists
- *    here (`normalizeVenueFor`) but isn't reachable through the interface.
- *    Flagged for a decision at Checkpoint 5 (ingestion), not resolved here.
- * 2. `getTeams`/`getPlayers` take no session/fixture scope, but OpenF1's
- *    roster data is inherently session-scoped (a driver's team can change
- *    session to session). This adapter approximates "current roster" by
- *    resolving the session closest to now — documented, not a perfect fit.
+ * One capability the shared `SportsProvider` interface still doesn't
+ * naturally fit, documented rather than silently worked around:
+ * `getTeams`/`getPlayers` take no session/fixture scope, but OpenF1's roster
+ * data is inherently session-scoped (a driver's team can change session to
+ * session). This adapter approximates "current roster" by resolving the
+ * session closest to now — documented, not a perfect fit, not changed this
+ * checkpoint (see docs/CONTEXT.md §9 "Known limitations").
  */
 export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider {
   readonly id = "openf1";
@@ -127,14 +128,13 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
   }
 
   /**
-   * Venue normalization, reachable outside the `SportsProvider` interface
-   * (see class doc). Ingestion (Checkpoint 5) needs to call this alongside
-   * `getFixtures` to populate `Venue` rows before `Fixture.venueId` can
-   * reference them — this adapter can't decide that ordering on its own.
+   * Ingestion has to call this *before* `getFixtures` when bootstrapping, so
+   * `Fixture.venueId` has a real row to reference (FK) — this adapter can't
+   * decide that ordering on its own, only expose the data.
    */
-  async getVenuesForSeason(seasonId: string) {
-    const year = yearFromSeasonId(seasonId);
-    const meetings = await this.timed("getVenuesForSeason", () =>
+  async getVenues(input?: { competitionId?: string; seasonId?: string }): Promise<Venue[]> {
+    const year = input?.seasonId ? yearFromSeasonId(input.seasonId) : new Date().getFullYear();
+    const meetings = await this.timed("getVenues", () =>
       this.client.get<OpenF1Meeting>("/meetings", { year }),
     );
     const seen = new Set<string>();
@@ -142,6 +142,10 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
       .map(normalizeVenue)
       .filter((venue) => (seen.has(venue.id) ? false : (seen.add(venue.id), true)));
   }
+
+  /** TTL cache for `getReferenceDrivers()` — see that method's doc comment. */
+  private referenceDriversCache: { fetchedAt: number; drivers: OpenF1Driver[] } | undefined;
+  private static readonly REFERENCE_DRIVERS_TTL_MS = 5 * 60 * 1000;
 
   /**
    * Approximation documented in the class doc: resolves the session whose
@@ -164,10 +168,34 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
     );
   }
 
+  /**
+   * `getTeams` and `getPlayers` both ultimately want "drivers in the
+   * reference session" — originally each called `resolveReferenceSession`
+   * and fetched `/drivers` independently, doubling the same 3 requests
+   * (`/meetings`, `/sessions`, `/drivers`). A live smoke test at Checkpoint
+   * 4 caught this doing real damage: called back-to-back with no pacing
+   * right after the (correctly paced) calendar bootstrap loop, the doubled
+   * burst tipped a bootstrap run over OpenF1's rate limit (docs/CONTEXT.md
+   * §9). A short TTL cache both halves the request count and gives callers
+   * that invoke `getTeams`/`getPlayers` close together (as bootstrap does)
+   * a consistent roster snapshot instead of two independently-resolved ones.
+   */
+  private async getReferenceDrivers(): Promise<OpenF1Driver[]> {
+    const now = Date.now();
+    if (this.referenceDriversCache && now - this.referenceDriversCache.fetchedAt < OpenF1Adapter.REFERENCE_DRIVERS_TTL_MS) {
+      return this.referenceDriversCache.drivers;
+    }
+
+    const session = await this.resolveReferenceSession();
+    const drivers = session
+      ? await this.client.get<OpenF1Driver>("/drivers", { session_key: session.session_key })
+      : [];
+    this.referenceDriversCache = { fetchedAt: now, drivers };
+    return drivers;
+  }
+
   async getTeams(_input?: { competitionId?: string }): Promise<Team[]> {
-    const session = await this.timed("getTeams", () => this.resolveReferenceSession());
-    if (!session) return [];
-    const drivers = await this.client.get<OpenF1Driver>("/drivers", { session_key: session.session_key });
+    const drivers = await this.timed("getTeams", () => this.getReferenceDrivers());
     const seen = new Set<string>();
     return drivers
       .map(normalizeTeam)
@@ -175,9 +203,7 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
   }
 
   async getPlayers(input?: { teamId?: string }): Promise<Player[]> {
-    const session = await this.timed("getPlayers", () => this.resolveReferenceSession());
-    if (!session) return [];
-    const drivers = await this.client.get<OpenF1Driver>("/drivers", { session_key: session.session_key });
+    const drivers = await this.timed("getPlayers", () => this.getReferenceDrivers());
     const players = drivers.map(normalizePlayer);
     return input?.teamId ? players.filter((p) => p.teamId === input.teamId) : players;
   }
@@ -309,26 +335,34 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
   }
 
   /**
-   * Current-state timing patches (laps/intervals/stints), separate from
-   * `pollLiveEvents` because intervals and stints don't have a dedicated
-   * LiveEvent type (Checkpoint 2 §7.3) — they only ever feed `DriverTiming`,
-   * never the append-only stream. Not wired into ingestion this checkpoint;
-   * exposed for Checkpoint 5 to use.
+   * Current-state timing patches (laps/intervals/stints/position), separate
+   * from `pollLiveEvents` because intervals and stints don't have a
+   * dedicated LiveEvent type (Checkpoint 2 §7.3) — they only ever feed
+   * `DriverTiming`, never the append-only stream. Position is fetched here
+   * too even though `pollLiveEvents` also reads it (for POSITION_CHANGE
+   * diffing) — `DriverTiming.position` is required and non-null, so
+   * ingestion needs the *current* value regardless of whether it changed
+   * this tick, which `pollLiveEvents`'s diff-only view can't provide alone.
+   * Known, accepted duplicate fetch — see docs/CONTEXT.md §9's ingestion
+   * limitations note, not fixed this checkpoint to avoid widening the
+   * adapter's public surface further right now.
    */
   async getDriverTimingPatches(sessionId: string, since?: string): Promise<DriverTimingPatch[]> {
     const sessionKey = sessionKeyFromSessionId(sessionId);
     const dateFilter = since ? { "date>": since } : {};
     const lapDateFilter = since ? { "date_start>": since } : {};
 
-    const [laps, intervals, stints] = await this.timed("getDriverTimingPatches", () =>
+    const [laps, intervals, stints, positions] = await this.timed("getDriverTimingPatches", () =>
       Promise.all([
         this.client.get<OpenF1Lap>("/laps", { session_key: sessionKey, ...lapDateFilter }),
         this.client.get<OpenF1Interval>("/intervals", { session_key: sessionKey, ...dateFilter }),
         this.client.get<OpenF1Stint>("/stints", { session_key: sessionKey }),
+        this.client.get<OpenF1Position>("/position", { session_key: sessionKey, ...dateFilter }),
       ]),
     );
 
     const patches: DriverTimingPatch[] = [
+      ...positions.map((position) => positionTimingPatch(position, sessionId)),
       ...laps.map((lap) => lapTimingPatch(lap, sessionId)),
       ...intervals.map((interval) => intervalTimingPatch(interval, sessionId)),
       ...stints.map((stint) => normalizeStint(stint, sessionId)),

@@ -91,9 +91,9 @@ describe("OpenF1Adapter — F1-specific behavior, offline via FixtureOpenF1Clien
     expect(result.map((s) => s.type)).toEqual(["FP1", "FP2", "FP3", "QUALIFYING", "RACE"]);
   });
 
-  it("getVenuesForSeason deduplicates venues shared across meetings", async () => {
+  it("getVenues deduplicates venues shared across meetings", async () => {
     const adapter = makeAdapter();
-    const venues = await adapter.getVenuesForSeason("f1-season-2024");
+    const venues = await adapter.getVenues({ seasonId: "f1-season-2024" });
     expect(venues).toEqual([{ id: "f1-circuit-7", name: "Spa-Francorchamps", country: "Belgium", timezone: "+02:00" }]);
   });
 
@@ -109,6 +109,27 @@ describe("OpenF1Adapter — F1-specific behavior, offline via FixtureOpenF1Clien
     const redBullDrivers = await adapter.getPlayers({ teamId: "f1-team-red-bull-racing" });
     expect(redBullDrivers.every((p) => p.teamId === "f1-team-red-bull-racing")).toBe(true);
     expect(redBullDrivers.find((p) => p.shortName === "VER")).toBeDefined();
+  });
+
+  it("caches the reference-driver lookup across getTeams and getPlayers, rather than fetching it twice", async () => {
+    const calls: string[] = [];
+    const countingClient: OpenF1HttpClient = {
+      async get<T>(path: string): Promise<T[]> {
+        calls.push(path);
+        return new FixtureOpenF1Client().get<T>(path);
+      },
+    };
+    const adapter = new OpenF1Adapter({ client: countingClient });
+
+    await adapter.getTeams();
+    await adapter.getPlayers();
+
+    // Without caching this would be 6 (meetings+sessions+drivers, twice) —
+    // the exact doubling a live smoke test caught tipping a real bootstrap
+    // run over OpenF1's rate limit (docs/CONTEXT.md §9).
+    expect(calls.filter((p) => p === "/meetings")).toHaveLength(1);
+    expect(calls.filter((p) => p === "/sessions")).toHaveLength(1);
+    expect(calls.filter((p) => p === "/drivers")).toHaveLength(1);
   });
 
   it("getStandings returns [] gracefully when OpenF1's beta championship endpoints have no data (the real, verified case)", async () => {
