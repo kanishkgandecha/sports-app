@@ -88,6 +88,14 @@ describe("publishLiveEvent (integration, real Postgres)", () => {
   });
 
   it("notifies the live_events channel on a genuine new event, preserving the Phase 0 LISTEN/NOTIFY -> SSE pipeline", async () => {
+    // `live_events` is one global Postgres channel, shared by every
+    // ingestion test file that publishes (job.test.ts, this file, ...) —
+    // real infrastructure, not a test-only detail (apps/api's LiveEventBus
+    // listens on the exact same channel). Vitest runs test files
+    // concurrently, so this listener can genuinely observe *other* files'
+    // notifications arriving around the same time — filtering to this
+    // test's own event id is what makes the assertion robust to that,
+    // rather than assuming exclusive use of shared infrastructure.
     const listener = new Client({ connectionString: process.env.DATABASE_URL });
     await listener.connect();
     await listener.query("LISTEN live_events");
@@ -100,8 +108,9 @@ describe("publishLiveEvent (integration, real Postgres)", () => {
     await publishLiveEvent(event("publish-test-3"));
     await new Promise((resolve) => setTimeout(resolve, 200)); // let the notification arrive
 
-    expect(received).toHaveLength(1);
-    expect(JSON.parse(received[0])).toMatchObject({ id: "publish-test-3", eventType: "SYNTHETIC_TICK" });
+    const own = received.filter((payload) => JSON.parse(payload).id === "publish-test-3");
+    expect(own).toHaveLength(1);
+    expect(JSON.parse(own[0])).toMatchObject({ id: "publish-test-3", eventType: "SYNTHETIC_TICK" });
 
     await listener.end();
   });
@@ -120,7 +129,9 @@ describe("publishLiveEvent (integration, real Postgres)", () => {
     await publishLiveEvent(event("publish-test-4")); // duplicate — should not notify
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    expect(received).toHaveLength(0);
+    const own = received.filter((payload) => JSON.parse(payload).id === "publish-test-4");
+    expect(own).toHaveLength(0);
+
     await listener.end();
   });
 });

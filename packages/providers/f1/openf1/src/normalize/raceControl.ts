@@ -35,7 +35,15 @@ type Classification =
  */
 export function classifyRaceControl(msg: OpenF1RaceControlMessage): Classification {
   if (msg.category === "SafetyCar") {
-    const isVsc = /VIRTUAL SAFETY CAR/i.test(msg.message);
+    // OpenF1's own message text for VSC events isn't consistent: 2023 data
+    // said "VIRTUAL SAFETY CAR DEPLOYED"; real 2026 data (found via
+    // Checkpoint 5's live backfill against the actual Australian GP —
+    // docs/CONTEXT.md §10) says the abbreviated "VSC DEPLOYED"/"VSC ENDING"
+    // instead. Matching only the former silently misclassified every VSC
+    // in the 2026 data as a full Safety Car. `\bVSC\b` catches both forms;
+    // the original "VIRTUAL SAFETY CAR" match is kept too since some
+    // seasons do spell it out.
+    const isVsc = /\bVSC\b|VIRTUAL SAFETY CAR/i.test(msg.message);
     return { category: isVsc ? "vsc" : "safety_car", eventType: "SAFETY_CAR" };
   }
 

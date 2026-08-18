@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OpenF1RaceControlMessage } from "../types";
 import { classifyRaceControl, normalizeRaceControlEvent, toRaceControlMessageRow } from "./raceControl";
 import australianGp2023 from "../fixtures/raceControl.australia2023race.json";
+import australianGp2026 from "../fixtures/raceControl.australia2026race.json";
 
 const realMessages = australianGp2023 as OpenF1RaceControlMessage[];
 
@@ -67,6 +68,30 @@ describe("classifyRaceControl — against real 2023 Australian GP data (session_
       qualifying_phase: null,
     };
     expect(classifyRaceControl(msg)).toEqual({ category: "message", eventType: "RACE_CONTROL_MESSAGE" });
+  });
+});
+
+describe("classifyRaceControl — against real 2026 Australian GP data (session_key 11234)", () => {
+  // Checkpoint 5's live backfill against this real, current-season session
+  // (docs/CONTEXT.md §10) found OpenF1's VSC message text isn't consistent
+  // across seasons — this data uses "VSC DEPLOYED"/"VSC ENDING" rather than
+  // 2023's "VIRTUAL SAFETY CAR DEPLOYED". Real evidence, not documentation.
+  const realMessages2026 = australianGp2026 as OpenF1RaceControlMessage[];
+  const find2026 = (predicate: (m: OpenF1RaceControlMessage) => boolean): OpenF1RaceControlMessage => {
+    const msg = realMessages2026.find(predicate);
+    if (!msg) throw new Error("Fixture message not found — fixture may have changed");
+    return msg;
+  };
+
+  it("classifies the abbreviated 'VSC DEPLOYED' form as vsc, not full safety_car", () => {
+    const msg = find2026((m) => m.message === "VSC DEPLOYED");
+    expect(msg.category).toBe("SafetyCar"); // same provider category as full SC, same as the 2023 case
+    expect(classifyRaceControl(msg)).toEqual({ category: "vsc", eventType: "SAFETY_CAR" });
+  });
+
+  it("classifies the abbreviated 'VSC ENDING' form as vsc too", () => {
+    const msg = find2026((m) => m.message === "VSC ENDING");
+    expect(classifyRaceControl(msg)).toEqual({ category: "vsc", eventType: "SAFETY_CAR" });
   });
 });
 

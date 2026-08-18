@@ -131,5 +131,69 @@ export type DataFreshness = "live" | "updated" | "delayed" | "offline";
 
 export interface FreshnessInfo {
   state: DataFreshness;
-  updatedAt: string;
+  updatedAt: string | null;
+}
+
+/**
+ * One shared freshness computation, used by both the API (initial snapshot
+ * on page load) and the web client (reactive, as SSE events arrive) — see
+ * docs/CONTEXT.md §10. Having two independent implementations was the
+ * failure mode this specifically avoids: "LIVE" must mean the same thing
+ * everywhere it's shown, not "an SSE connection exists" (master brief §21).
+ */
+export const FRESHNESS_LIVE_THRESHOLD_MS = 20_000;
+export const FRESHNESS_DELAYED_THRESHOLD_MS = 90_000;
+
+/** Default safety cap for a session with no known end time — see docs/CONTEXT.md §9/§10. */
+export const DEFAULT_MAX_SESSION_DURATION_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * Recomputes upcoming/live/completed from wall-clock time against
+ * `startTime`/`endTime`, rather than trusting a stored `status` column that
+ * only gets set once at bootstrap and never refreshed — the same reasoning
+ * `apps/ingestion`'s active-session selection uses (docs/CONTEXT.md §9),
+ * now shared so `apps/api`'s F1 routes compute session liveness the exact
+ * same way instead of quietly re-deriving their own version of this logic.
+ */
+export function classifySessionLifecycle(
+  session: { startTime: string; endTime: string | null },
+  now: Date = new Date(),
+  maxDurationMs: number = DEFAULT_MAX_SESSION_DURATION_MS,
+): "upcoming" | "live" | "completed" {
+  const start = new Date(session.startTime);
+  const rawEnd = session.endTime ? new Date(session.endTime) : new Date(start.getTime() + maxDurationMs);
+  const effectiveEnd = new Date(Math.min(rawEnd.getTime(), start.getTime() + maxDurationMs));
+
+  if (now < start) return "upcoming";
+  if (now > effectiveEnd) return "completed";
+  return "live";
+}
+
+export function computeFreshness(input: {
+  lastEventAt: string | null;
+  isLive: boolean;
+  now?: number;
+}): FreshnessInfo {
+  const now = input.now ?? Date.now();
+
+  if (!input.isLive) {
+    // Not a live session right now (scheduled or completed) — never claim
+    // LIVE/DELAYED for something that isn't actually live.
+    return { state: "offline", updatedAt: input.lastEventAt };
+  }
+
+  if (!input.lastEventAt) {
+    // Live session, but nothing received yet — honest "we have nothing",
+    // not a fabricated freshness state.
+    return { state: "offline", updatedAt: null };
+  }
+
+  const ageMs = now - new Date(input.lastEventAt).getTime();
+  if (ageMs <= FRESHNESS_LIVE_THRESHOLD_MS) {
+    return { state: "live", updatedAt: input.lastEventAt };
+  }
+  if (ageMs <= FRESHNESS_DELAYED_THRESHOLD_MS) {
+    return { state: "delayed", updatedAt: input.lastEventAt };
+  }
+  return { state: "offline", updatedAt: input.lastEventAt };
 }

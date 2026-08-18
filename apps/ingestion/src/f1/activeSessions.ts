@@ -1,6 +1,7 @@
+import { classifySessionLifecycle, type Session as DomainSession } from "@sports/domain";
 import { config } from "../config";
 
-export type SessionLifecycleState = "upcoming" | "live" | "completed";
+export type SessionLifecycleState = ReturnType<typeof classifySessionLifecycle>;
 
 export interface SessionForScheduling {
   id: string;
@@ -16,24 +17,24 @@ export interface ActiveSessionTarget {
 
 /**
  * Pure, isolated, testable — deliberately not buried in the provider
- * adapter (this checkpoint's explicit requirement). Recomputes from
- * `startTime`/`endTime` against wall-clock time rather than trusting a
- * stored `status` column, which bootstrap sets once and never refreshes —
- * see docs/CONTEXT.md §9 "Active polling" for why that staleness risk
- * matters here specifically.
+ * adapter (Checkpoint 4's explicit requirement). Thin wrapper over the
+ * shared `classifySessionLifecycle` (moved to `@sports/domain` at
+ * Checkpoint 5 so `apps/api`'s F1 routes compute session liveness the same
+ * way instead of re-deriving their own version — docs/CONTEXT.md §10) that
+ * just adapts this module's `Date`-typed scheduling shape to the domain
+ * function's `string`-typed `Session` shape and supplies ingestion's own
+ * configured max-duration default.
  */
 export function classifySessionState(
   session: SessionForScheduling,
   now: Date,
   maxDurationMs: number = config.f1MaxSessionDurationMs,
 ): SessionLifecycleState {
-  const start = session.startTime;
-  const cappedEnd = session.endTime ?? new Date(start.getTime() + maxDurationMs);
-  const effectiveEnd = new Date(Math.min(cappedEnd.getTime(), start.getTime() + maxDurationMs));
-
-  if (now < start) return "upcoming";
-  if (now > effectiveEnd) return "completed";
-  return "live";
+  const asDomainSession: Pick<DomainSession, "startTime" | "endTime"> = {
+    startTime: session.startTime.toISOString(),
+    endTime: session.endTime ? session.endTime.toISOString() : null,
+  };
+  return classifySessionLifecycle(asDomainSession, now, maxDurationMs);
 }
 
 /**
