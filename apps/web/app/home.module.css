@@ -288,6 +288,10 @@
   color: var(--color-live);
 }
 
+/* Unused now that Cricket moved to "available" (Checkpoint 3) — kept, not
+   deleted, for the next sport's own turn through this same transition
+   (matches SiteNav.tsx's `"coming-next"` status, kept for the same
+   reason). */
 .pillComingNext {
   background: var(--color-accent-soft);
   color: var(--color-accent-strong);

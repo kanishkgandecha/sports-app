@@ -20,6 +20,12 @@ export interface CricketVenue {
   timezone: string;
 }
 
+export interface CricketCompetitionRef {
+  id: string;
+  name: string;
+  type: string;
+}
+
 export interface CricketFixture {
   id: string;
   slug: string;
@@ -27,6 +33,8 @@ export interface CricketFixture {
   status: string;
   startTime: string;
   venue: CricketVenue | null;
+  /** Real, already-related data (Cricket Checkpoint 3) — null only when a fixture genuinely has none, never omitted to save a join. */
+  competition: CricketCompetitionRef | null;
 }
 
 export type CricketSessionLifecycle = "upcoming" | "live" | "completed";

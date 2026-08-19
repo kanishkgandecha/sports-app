@@ -164,12 +164,13 @@ describe("Cricket routes (integration, real Postgres)", () => {
     await cleanup();
   });
 
-  it("GET /api/cricket/fixtures includes the seeded fixture with its venue", async () => {
+  it("GET /api/cricket/fixtures includes the seeded fixture with its venue and competition", async () => {
     const res = await app.inject({ method: "GET", url: "/api/cricket/fixtures" });
     expect(res.statusCode).toBe(200);
     const fixture = res.json().fixtures.find((f: { id: string }) => f.id === FIXTURE_ID);
     expect(fixture).toBeDefined();
     expect(fixture.venue).toMatchObject({ name: "Test Ground, Test City", country: null });
+    expect(fixture.competition).toMatchObject({ name: "Test Series 2099", type: "tournament" });
   });
 
   it("GET /api/cricket/fixtures/:id returns the fixture with sessions and real toss/format detail", async () => {
@@ -177,6 +178,7 @@ describe("Cricket routes (integration, real Postgres)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.fixture.id).toBe(FIXTURE_ID);
+    expect(body.fixture.competition).toMatchObject({ name: "Test Series 2099" });
     expect(body.sessions.map((s: { id: string }) => s.id)).toEqual([SESSION_ID, LIVE_SESSION_ID, SESSION_NO_STATE_ID]);
     expect(body.detail).toMatchObject({ format: "T20", tossDecision: "BAT" });
     expect(body.detail.tossWonByTeam.name).toBe("Test Team A");

@@ -8,17 +8,17 @@ interface NavItem {
   label: string;
   href: string;
   /** Product-shell metadata, not live data — Sport.status in Postgres has
-   * no row for cricket/football/esports yet (nothing's bootstrapped), and
-   * this needs to render correctly before any of that exists. Mirrors
-   * ARCHITECTURE.md's fixed implementation order: F1 → Cricket → Football
-   * → Esports. */
+   * no row for football/esports yet (nothing's bootstrapped), and this
+   * needs to render correctly before any of that exists. Cricket moved to
+   * "available" in Checkpoint 3 — it now has a real landing page, Event
+   * Center, and data pipeline, the same bar F1 already cleared. */
   status: "available" | "coming-next" | "planned";
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", href: "/", status: "available" },
   { label: "Formula 1", href: "/sports/f1", status: "available" },
-  { label: "Cricket", href: "/sports/cricket", status: "coming-next" },
+  { label: "Cricket", href: "/sports/cricket", status: "available" },
   { label: "Football", href: "/sports/football", status: "planned" },
   { label: "Esports", href: "/sports/esports", status: "planned" },
   { label: "Learn", href: "/learn", status: "planned" },
@@ -26,10 +26,11 @@ const NAV_ITEMS: NavItem[] = [
 
 /**
  * One multi-sport product, not an F1-only site with extra links (Checkpoint
- * 7's explicit requirement) — every sport is a real nav destination; the
- * ones without a built product yet route to an honest "coming soon" page
- * (see app/sports/[cricket|football|esports]/page.tsx) rather than a bare
- * 404 or, worse, a page that pretends to be finished.
+ * 7's explicit requirement) — every sport is a real nav destination; F1 and
+ * Cricket (Checkpoint 3) route to real landing pages/Event Centers, and
+ * the ones without a built product yet (Football, Esports) route to an
+ * honest "coming soon" page (see app/sports/[football|esports]/page.tsx)
+ * rather than a bare 404 or, worse, a page that pretends to be finished.
  */
 export function SiteNav() {
   const pathname = usePathname();

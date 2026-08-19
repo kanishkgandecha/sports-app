@@ -10,8 +10,9 @@ import {
   type F1Session,
 } from "../../../lib/f1Api";
 import { apiGet } from "../../../lib/api";
+import { formatDate } from "../../../lib/format";
 import styles from "./f1Landing.module.css";
-import { Countdown } from "./Countdown";
+import { Countdown } from "../../../components/Countdown";
 
 export const metadata: Metadata = { title: "Formula 1 — Sports Platform" };
 
@@ -32,10 +33,6 @@ async function getFixtures(): Promise<F1Fixture[]> {
   } catch {
     return [];
   }
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 /** Prefers a session that's currently live, else the nearest upcoming one, else the most recently completed — the single "what should I look at right now" answer for the hero. */
@@ -89,7 +86,7 @@ export default async function F1LandingPage() {
               <div className={styles.heroMeta}>
                 {featuredSession && featuredSession.lifecycle !== "completed" && (
                   <div className={styles.countdown}>
-                    <Countdown targetIso={featuredSession.startTime} />
+                    <Countdown targetIso={featuredSession.startTime} valueClassName={styles.countdownValue} />
                     <span className={styles.countdownLabel}>
                       until {SESSION_LABEL[featuredSession.type] ?? featuredSession.type}
                     </span>

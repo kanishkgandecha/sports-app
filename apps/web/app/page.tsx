@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { apiGet } from "../lib/api";
 import type { F1Fixture } from "../lib/f1Api";
+import { formatDate } from "../lib/format";
 import { ConceptChip } from "../components/ConceptChip";
 import styles from "./home.module.css";
 
@@ -15,12 +16,7 @@ async function getF1Fixtures(): Promise<F1Fixture[]> {
   }
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
 const PLANNED_SPORTS = [
-  { name: "Cricket", slug: "cricket", pill: "Coming next", pillClass: "pillComingNext" as const, blurb: "Provider research underway — see Checkpoint 7." },
   { name: "Football", slug: "football", pill: "Planned", pillClass: "pillPlanned" as const, blurb: "After Cricket, per the fixed build order." },
   { name: "Esports", slug: "esports", pill: "Planned", pillClass: "pillPlanned" as const, blurb: "Esports World Cup coverage, last in the build order." },
 ];
@@ -28,8 +24,17 @@ const PLANNED_SPORTS = [
 /**
  * The home feed (Checkpoint 7 §"Live home feed"): LIVE / UPCOMING /
  * RESULTS, across all sports — today that means real F1 data in each
- * bucket and honest coming-soon cards for every other sport. Nothing here
- * fabricates Cricket/Football/Esports data to fill space.
+ * bucket and honest coming-soon cards for Football/Esports. Cricket
+ * Checkpoint 3: the "all sports" directory grid now shows Cricket as a
+ * real available sport (its own landing page, Event Center, and data
+ * pipeline all exist — the same bar F1 already cleared), matching
+ * `SiteNav`'s status change. The LIVE/UPCOMING/RESULTS feed itself stays
+ * F1-scoped for now — merging a second sport's fixtures into one ranked
+ * feed (cross-sport sorting, per-row sport labeling) is a genuine
+ * architecture question of its own, not implied by "Cricket needs a
+ * landing page" (docs/CONTEXT.md's Cricket Checkpoint 3 section records
+ * this as a deliberate scope boundary, not an oversight). Nothing here
+ * fabricates Football/Esports data to fill space.
  */
 export default async function HomePage() {
   const fixtures = await getF1Fixtures();
@@ -52,9 +57,10 @@ export default async function HomePage() {
           </span>
           <h1 className={styles.heroTitle}>Follow the race. Understand every moment.</h1>
           <p className={styles.heroLede}>
-            Real-time Formula 1 — timing, race control, standings — with a plain-language
-            explanation one tap away whenever something you don&apos;t recognize happens.
-            Cricket, football, and esports follow the same way, one sport at a time.
+            Real-time Formula 1 and Cricket — timing and standings for F1, scorecards and
+            ball-by-ball for Cricket — with a plain-language explanation one tap away whenever
+            something you don&apos;t recognize happens. Football and esports follow the same
+            way, one sport at a time.
           </p>
           <div className={styles.heroActions}>
             <Link href="/sports/f1" className={styles.buttonPrimary}>
@@ -115,6 +121,11 @@ export default async function HomePage() {
             <span className={`${styles.pill} ${styles.pillLive}`}>Live</span>
             <span className={styles.sportCardTitle}>Formula 1</span>
             <p className={styles.sportCardMeta}>Timing, race control, standings — live.</p>
+          </Link>
+          <Link href="/sports/cricket" className={`${styles.sportCard} ${styles.sportCardAvailable}`}>
+            <span className={`${styles.pill} ${styles.pillLive}`}>Live</span>
+            <span className={styles.sportCardTitle}>Cricket</span>
+            <p className={styles.sportCardMeta}>Scorecards, innings, ball-by-ball — live.</p>
           </Link>
           {PLANNED_SPORTS.map((sport) => (
             <Link key={sport.slug} href={`/sports/${sport.slug}`} className={styles.sportCard}>

@@ -24,7 +24,7 @@ export async function cricketRoutes(app: FastifyInstance) {
     const fixtures = await prisma.fixture.findMany({
       where: { sport: { slug: "cricket" }, ...(req.query.status ? { status: req.query.status } : {}) },
       orderBy: { startTime: "desc" },
-      include: { venue: true },
+      include: { venue: true, competition: true },
     });
     return { fixtures: fixtures.map(toFixtureSummary) };
   });
@@ -32,7 +32,7 @@ export async function cricketRoutes(app: FastifyInstance) {
   app.get<{ Params: { fixtureId: string } }>("/api/cricket/fixtures/:fixtureId", async (req, reply) => {
     const fixture = await prisma.fixture.findFirst({
       where: { id: req.params.fixtureId, sport: { slug: "cricket" } },
-      include: { venue: true, sessions: { orderBy: { startTime: "asc" } } },
+      include: { venue: true, competition: true, sessions: { orderBy: { startTime: "asc" } } },
     });
     if (!fixture) {
       return reply.code(404).send({ error: `No Cricket fixture "${req.params.fixtureId}"` });
@@ -58,7 +58,7 @@ export async function cricketRoutes(app: FastifyInstance) {
   app.get<{ Params: { sessionId: string } }>("/api/cricket/sessions/:sessionId", async (req, reply) => {
     const session = await prisma.session.findFirst({
       where: { id: req.params.sessionId, fixture: { sport: { slug: "cricket" } } },
-      include: { fixture: { include: { venue: true } } },
+      include: { fixture: { include: { venue: true, competition: true } } },
     });
     if (!session) {
       return reply.code(404).send({ error: `No Cricket session "${req.params.sessionId}"` });
@@ -279,6 +279,17 @@ function unknownPlayer(playerId: string) {
   return { id: playerId, name: playerId, shortName: null, avatarUrl: null };
 }
 
+/**
+ * Cricket Checkpoint 3 — `competition` added to the fixture summary
+ * (previously venue-only). Real, already-related data (`Fixture.
+ * competitionId` has pointed at a real `Competition` row since Checkpoint
+ * 1's bootstrap; nothing new is derived or guessed) that the landing
+ * page's brief explicitly asks to surface "when it already exists" —
+ * unlike F1 (one championship, so competition context was never
+ * interesting there), Cricket's real data spans genuinely different
+ * competitions (a bilateral T20I series, an ODI tour, a domestic T20
+ * league), so this is meaningfully new information, not decoration.
+ */
 function toFixtureSummary(fixture: {
   id: string;
   slug: string;
@@ -286,6 +297,7 @@ function toFixtureSummary(fixture: {
   status: string;
   startTime: Date;
   venue: { id: string; name: string; country: string | null; timezone: string } | null;
+  competition: { id: string; name: string; type: string } | null;
 }) {
   return {
     id: fixture.id,
@@ -294,6 +306,7 @@ function toFixtureSummary(fixture: {
     status: fixture.status,
     startTime: fixture.startTime.toISOString(),
     venue: fixture.venue,
+    competition: fixture.competition,
   };
 }
 
