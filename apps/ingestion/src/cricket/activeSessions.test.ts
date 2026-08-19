@@ -44,3 +44,38 @@ describe("getActiveCricketSessions", () => {
     expect(getActiveCricketSessions([])).toEqual([]);
   });
 });
+
+/**
+ * Cricket Checkpoint 4 (request-budget remediation) — real request volume
+ * scales linearly with however many sessions are simultaneously "live";
+ * without a cap this is unbounded (a real `currentMatches` snapshot this
+ * project captured had 18 matches in flight at once).
+ */
+describe("getActiveCricketSessions — cricketMaxActiveSessions cap", () => {
+  it("caps the number of active sessions at config.cricketMaxActiveSessions, never returning more", () => {
+    const many = Array.from({ length: config.cricketMaxActiveSessions + 5 }, (_, i) => session(`live-${i}`, -(i + 1) * 60_000, HOUR));
+    const active = getActiveCricketSessions(many);
+    expect(active.length).toBe(config.cricketMaxActiveSessions);
+  });
+
+  it("prioritizes the earliest-started sessions, deterministically, over more recently started ones", () => {
+    // Deliberately out of order — the earliest-started (most negative offset) must still win.
+    // durationMs = 2 * HOUR (not the default HOUR) so all three genuinely
+    // still classify as live at these offsets (their endTime hasn't
+    // passed yet) — the cap logic under test is priority ordering, not
+    // lifecycle classification (already covered above).
+    const sessions = [
+      session("started-10min-ago", -10 * 60_000, 2 * HOUR),
+      session("started-90min-ago", -90 * 60_000, 2 * HOUR),
+      session("started-45min-ago", -45 * 60_000, 2 * HOUR),
+    ];
+    const active = getActiveCricketSessions(sessions);
+    expect(active.map((a) => a.sessionId)).toEqual(["started-90min-ago", "started-45min-ago", "started-10min-ago"].slice(0, config.cricketMaxActiveSessions));
+  });
+
+  it("does not cap or reorder when the number of live sessions is at or under the limit", () => {
+    const sessions = [session("a", -10 * 60_000, HOUR), session("b", -20 * 60_000, HOUR)];
+    const active = getActiveCricketSessions(sessions);
+    expect(active.map((a) => a.sessionId)).toEqual(["b", "a"]); // still sorted earliest-first, just not truncated
+  });
+});

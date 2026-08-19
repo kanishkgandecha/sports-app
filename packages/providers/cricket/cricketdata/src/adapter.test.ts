@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { sportsProviderContractTests } from "@sports/providers-core/testing";
 import { CricketDataAdapter } from "./adapter";
 import type { CricketDataHttpClient } from "./client";
@@ -184,8 +184,20 @@ describe("CricketDataAdapter — Cricket-specific behavior, offline via FixtureC
     const adapter = new CricketDataAdapter({ client: new TwoTickClient() });
     const sessionId = `cricket-match-${INNINGS_BREAK_ID}-innings-2`;
     await adapter.pollLiveEvents({ sessionId }); // seed
-    const second = await adapter.pollLiveEvents({ sessionId });
-    expect(second.some((e) => e.eventType === "WICKET")).toBe(true);
+    // Real production ticks are `cricketPollIntervalMs` (30min) apart, far
+    // past the adapter's 5-minute match_info cache TTL (Cricket Checkpoint
+    // 4's request-budget remediation) — advance past it here too, so this
+    // test exercises the same real gap a genuine second poll tick has,
+    // rather than accidentally serving the second call from cache (which
+    // would defeat the diff and fail this assertion for the wrong reason).
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 6 * 60 * 1000);
+    try {
+      const second = await adapter.pollLiveEvents({ sessionId });
+      expect(second.some((e) => e.eventType === "WICKET")).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("getInningsState normalizes real current state for every real innings", async () => {
@@ -305,5 +317,156 @@ describe("CricketDataAdapter — error handling passthrough", () => {
     });
     await expect(adapter.getVenues()).rejects.toThrow();
     expect(logs).toEqual([{ method: "getVenues", ok: false }]);
+  });
+});
+
+/**
+ * Cricket Checkpoint 4 — request-budget remediation. These tests exist
+ * specifically because the previous test suite (above) never caught the
+ * real bug: `getCompetitions`/`getSeasons` each independently called
+ * `getSeriesInfo` for the same series, and the four state-refresh methods
+ * each independently called `getMatchInfo` for the same match, even when
+ * called through `Promise.all` (genuinely concurrent, not just
+ * back-to-back `await`s) — see docs/CONTEXT.md's Cricket Checkpoint 4
+ * remediation section for the full audit and arithmetic.
+ */
+describe("CricketDataAdapter — request-budget remediation (Cricket Checkpoint 4)", () => {
+  it("getCompetitions then getSeasons for the same series issues exactly ONE real getSeriesInfo request, not two", async () => {
+    let seriesInfoCalls = 0;
+    class CountingClient extends FixtureCricketDataClient {
+      async getSeriesInfo(seriesId: string) {
+        seriesInfoCalls += 1;
+        return super.getSeriesInfo(seriesId);
+      }
+    }
+    const adapter = new CricketDataAdapter({ client: new CountingClient() });
+    // Real series id from the real trimmed currentMatches fixture (also
+    // used elsewhere in this file) — deliberately not derived from
+    // `getCompetitions()`'s own return value, since `FixtureCricketDataClient
+    // .getSeriesInfo` always answers with the same one real captured
+    // response regardless of which id was requested, so the *response's*
+    // `data.info.id` isn't a reliable stand-in for "the id bootstrap.ts
+    // will actually call getSeasons with" the way it would be against the
+    // real API (which echoes back the id you asked for).
+    const realCompetitionId = "cricket-series-6c3c5876-5cfc-4490-9c8e-8ba90aec4323";
+    await adapter.getCompetitions(); // default maxSeriesLookups covers all 3 real series ids in the fixture, including this one
+    const before = seriesInfoCalls;
+
+    await adapter.getSeasons({ competitionId: realCompetitionId });
+    expect(seriesInfoCalls).toBe(before); // no NEW real request — reused the cache getCompetitions already populated
+  });
+
+  it("Promise.all over getInningsState/getScorecard/getRosterForFixture/getFixtureDetail — the real state-refresh tick shape (apps/ingestion/src/cricket/job.ts) — issues exactly ONE real getMatchInfo request, not four", async () => {
+    let matchInfoCalls = 0;
+    class CountingClient extends FixtureCricketDataClient {
+      async getMatchInfo(matchId: string) {
+        matchInfoCalls += 1;
+        return super.getMatchInfo(matchId);
+      }
+    }
+    const adapter = new CricketDataAdapter({ client: new CountingClient() });
+    const fixtureId = `cricket-match-${SCORECARD_AVAILABLE_ID}`;
+
+    await Promise.all([
+      adapter.getInningsState(fixtureId),
+      adapter.getScorecard(fixtureId),
+      adapter.getRosterForFixture(fixtureId),
+      adapter.getFixtureDetail(fixtureId),
+    ]);
+
+    expect(matchInfoCalls).toBe(1);
+  });
+
+  it("concurrent getScorecard callers (Promise.all, not sequential awaits) issue exactly ONE real getMatchScorecard request", async () => {
+    let scorecardCalls = 0;
+    class CountingClient extends FixtureCricketDataClient {
+      async getMatchScorecard(matchId: string) {
+        scorecardCalls += 1;
+        return super.getMatchScorecard(matchId);
+      }
+    }
+    const adapter = new CricketDataAdapter({ client: new CountingClient() });
+    const fixtureId = `cricket-match-${SCORECARD_AVAILABLE_ID}`;
+
+    await Promise.all([adapter.getScorecard(fixtureId), adapter.getScorecard(fixtureId), adapter.getScorecard(fixtureId)]);
+
+    expect(scorecardCalls).toBe(1);
+  });
+
+  it("does not re-request within the 5-minute cache TTL, but does after it expires", async () => {
+    let matchInfoCalls = 0;
+    class CountingClient extends FixtureCricketDataClient {
+      async getMatchInfo(matchId: string) {
+        matchInfoCalls += 1;
+        return super.getMatchInfo(matchId);
+      }
+    }
+    const adapter = new CricketDataAdapter({ client: new CountingClient() });
+    const fixtureId = `cricket-match-${SCORECARD_AVAILABLE_ID}`;
+
+    await adapter.getFixtureDetail(fixtureId);
+    expect(matchInfoCalls).toBe(1);
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(Date.now() + 4 * 60 * 1000); // still within the 5-minute TTL
+      await adapter.getFixtureDetail(fixtureId);
+      expect(matchInfoCalls).toBe(1); // no new request yet
+
+      vi.setSystemTime(Date.now() + 2 * 60 * 1000); // now past it
+      await adapter.getFixtureDetail(fixtureId);
+      expect(matchInfoCalls).toBe(2); // real refresh allowed again
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a shared failure is returned to every concurrent caller, and does not poison the cache forever — a later call after the TTL can succeed", async () => {
+    let matchInfoCalls = 0;
+    class FlakyClient extends FixtureCricketDataClient {
+      async getMatchInfo(matchId: string) {
+        matchInfoCalls += 1;
+        if (matchInfoCalls === 1) throw new Error("simulated transient network failure");
+        return super.getMatchInfo(matchId);
+      }
+    }
+    const adapter = new CricketDataAdapter({ client: new FlakyClient() });
+    const fixtureId = `cricket-match-${SCORECARD_AVAILABLE_ID}`;
+
+    // Two concurrent callers sharing the one (failing) in-flight request —
+    // both degrade gracefully (getFixtureDetail swallows to undefined),
+    // neither throws past the adapter boundary, and only ONE real request
+    // was actually made for both of them.
+    const [a, b] = await Promise.all([adapter.getFixtureDetail(fixtureId), adapter.getFixtureDetail(fixtureId)]);
+    expect(a).toBeUndefined();
+    expect(b).toBeUndefined();
+    expect(matchInfoCalls).toBe(1);
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(Date.now() + 6 * 60 * 1000); // past the TTL — the failed entry is not cached forever
+      const retried = await adapter.getFixtureDetail(fixtureId);
+      expect(retried).toBeDefined();
+      expect(matchInfoCalls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("getRequestBudgetStatus reflects the real, provider-reported hitsToday/hitsLimit from the most recent real response", async () => {
+    const adapter = new CricketDataAdapter({ client: new FixtureCricketDataClient() });
+    expect(adapter.getRequestBudgetStatus()).toBeUndefined(); // no real request made yet this process
+
+    await adapter.getVenues(); // a real getCurrentMatches call — the fixture's own real info: hitsToday=2, hitsLimit=100
+    const status = adapter.getRequestBudgetStatus();
+    expect(status).toMatchObject({ hitsToday: 2, hitsLimit: 100 });
+  });
+
+  it("getRequestBudgetStatus does not update on a cache hit — only real requests move it", async () => {
+    const adapter = new CricketDataAdapter({ client: new FixtureCricketDataClient() });
+    await adapter.getVenues();
+    const first = adapter.getRequestBudgetStatus();
+    await adapter.getTeams(); // shares the same cached getCurrentMatches — no new real request
+    expect(adapter.getRequestBudgetStatus()).toEqual(first);
   });
 });

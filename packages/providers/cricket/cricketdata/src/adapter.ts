@@ -21,7 +21,16 @@ import { normalizePlayersFromScorecard } from "./normalize/player";
 import { deriveInningsTeamOrder, normalizeInningsState, normalizeSessions } from "./normalize/innings";
 import { diffInningsScore, diffMatchStatus, normalizeBalls } from "./normalize/events";
 import { normalizeBattingFigures, normalizeBowlingFigures } from "./normalize/scorecard";
-import type { CricketDataMatchSummary, CricketDataScoreEntry, CricketDataScorecardResponse } from "./types";
+import type {
+  CricketDataBallByBallResponse,
+  CricketDataMatchInfoResponse,
+  CricketDataMatchListResponse,
+  CricketDataMatchSummary,
+  CricketDataResponseInfo,
+  CricketDataScoreEntry,
+  CricketDataScorecardResponse,
+  CricketDataSeriesInfoResponse,
+} from "./types";
 
 /**
  * CricketData.org-backed `SportsProvider` (Cricket Checkpoint 1 —
@@ -33,11 +42,26 @@ import type { CricketDataMatchSummary, CricketDataScoreEntry, CricketDataScoreca
  * to** (see types.ts/client.ts's doc comments for the evidence):
  *
  *  - **100 requests/day, confirmed via the API's own real response
- *    metadata** (`info.hitsLimit`), not just documentation. Every method
- *    here is written to make the fewest possible real calls — `getFixtures`/
- *    `getTeams`/`getVenues` all share a single `getCurrentMatches()` call
- *    where possible; `pollLiveEvents` makes exactly one `match_info` call
- *    per active session per tick, not three.
+ *    metadata** (`info.hitsLimit`), not just documentation. Every real
+ *    request this adapter can make goes through one shared, single-flight,
+ *    TTL-cached primitive (`cachedRequest`, below) keyed by exactly what
+ *    it's fetching (the current-matches list; one match's `match_info`;
+ *    one match's `match_scorecard`/`match_bbb`; one series' `series_info`)
+ *    — `getFixtures`/`getTeams`/`getVenues`/`getPlayers` share the current-
+ *    matches cache; `getInningsState`/`getScorecard`/`getRosterForFixture`/
+ *    `getFixtureDetail`/`pollLiveEvents` share the match-info cache;
+ *    `getCompetitions`/`getSeasons` share the series-info cache per series.
+ *    **This was NOT always true** — Cricket Checkpoint 4's request-budget
+ *    remediation (docs/CONTEXT.md) found and fixed a real bug where
+ *    `match_info`/`series_info` had no cache at all, so a single ingestion
+ *    tick's `Promise.all` over the four state-refresh methods made 4
+ *    duplicate real `match_info` requests instead of 1, and bootstrap made
+ *    a duplicate `series_info` request per series (once from
+ *    `getCompetitions`, again from `getSeasons`) every single tick — see
+ *    that section for the full audit and the corrected request arithmetic.
+ *    `getRequestBudgetStatus()` additionally exposes the provider's own
+ *    live-reported `hitsToday`/`hitsLimit` so `apps/ingestion` can skip
+ *    optional work once real usage is close to the daily cap.
  *  - **No roster/squad endpoint reliably available** (`hasSquad: false` on
  *    every real match sampled) — `getPlayers` is necessarily best-effort,
  *    built from `match_scorecard` entries as they appear, not a clean
@@ -72,22 +96,51 @@ export class CricketDataAdapter extends BaseProviderAdapter implements SportsPro
   /** fixtureId -> last-seen free-text status, for diffing into MATCH_STATUS LiveEvents. */
   private readonly lastKnownStatus = new Map<string, string>();
 
-  /** TTL cache for `getCurrentMatches()` — see `getCachedCurrentMatches`'s doc comment. */
-  private currentMatchesCache: { fetchedAt: number; response: Awaited<ReturnType<CricketDataHttpClient["getCurrentMatches"]>> } | undefined;
-  private static readonly CURRENT_MATCHES_TTL_MS = 5 * 60 * 1000;
+  /**
+   * Cricket Checkpoint 4 (request-budget remediation) — one single-flight,
+   * TTL-cached, per-key request cache shared by every real endpoint this
+   * adapter calls, replacing three separate ad hoc caches (Checkpoints
+   * 1-2) that were only ever safe against *sequential* callers.
+   * `apps/ingestion/src/cricket/job.ts`'s real state-refresh tick calls
+   * `getInningsState`/`getScorecard`/`getRosterForFixture`/
+   * `getFixtureDetail` via `Promise.all` — genuinely concurrent — and the
+   * old "check cache, `await` fetch, then write cache" pattern let every
+   * concurrent caller observe a miss before the first one's fetch had
+   * resolved, so up to 4 real, duplicate `match_info` requests fired for
+   * what should have been 1. Caching the in-flight *promise*, written
+   * synchronously in `cachedRequest` below (before its own first
+   * `await` — there isn't one), closes that gap: thanks to JS's
+   * run-to-completion semantics, `Promise.all([a(), b()])` invokes `a()`
+   * and `b()` back-to-back synchronously up to each one's first real
+   * `await` — the first caller's cache write always lands before the
+   * second caller's read, no matter how many concurrent callers there
+   * are sharing the same key. A rejected fetch is cached too (concurrent
+   * callers should share one failure, not each independently retry and
+   * fail against the same dead request) but still expires normally at
+   * the TTL — never poisoned forever.
+   *
+   * Keys: `"currentMatches"` (one global entry), `` `matchInfo:${matchId}` ``,
+   * `` `scorecard:${matchId}` ``, `` `bbb:${matchId}` ``,
+   * `` `series:${seriesId}` ``. 5 minutes for all of them — far shorter
+   * than any real ingestion cadence (`cricketPollIntervalMs`≥30min,
+   * `cricketInningsStateIntervalMs`≥60min — apps/ingestion/src/config.ts),
+   * so this never blunts live-score responsiveness; it only collapses
+   * calls that were already happening within the same tick (or, for
+   * `matchInfo`, between a poll tick and a state-refresh tick landing
+   * close together).
+   */
+  private readonly requestCache = new Map<string, { fetchedAt: number; promise: Promise<unknown> }>();
+  private static readonly REQUEST_CACHE_TTL_MS = 5 * 60 * 1000;
 
   /**
-   * TTL cache for `getMatchScorecard(matchId)` — Checkpoint 2 introduced a
-   * second real caller of the same real `match_scorecard` request
-   * (`getScorecard`, alongside `getInningsState`'s existing one), both
-   * typically called back-to-back in the same ingestion tick (see
-   * `apps/ingestion/src/cricket/job.ts`'s state-refresh step) — same
-   * "don't double a real call the caller already paid for" reasoning as
-   * `getCachedCurrentMatches`, keyed per match since (unlike
-   * `currentMatches`) this is match-specific data.
+   * The provider's own real, live-reported usage (`info.hitsToday`/
+   * `hitsLimit` — confirmed real on every response, see client.ts's doc
+   * comment), observed passively from whichever real (non-cache-hit)
+   * response happens to come back — never a request spent just to check
+   * it. `undefined` until this process has made at least one real
+   * request. See `getRequestBudgetStatus`.
    */
-  private readonly matchScorecardCache = new Map<string, { fetchedAt: number; response: CricketDataScorecardResponse }>();
-  private static readonly MATCH_SCORECARD_TTL_MS = 5 * 60 * 1000;
+  private lastKnownUsage: { hitsToday: number; hitsLimit: number; observedAt: number } | undefined;
 
   constructor(options: { client?: CricketDataHttpClient; apiKey?: string; onRequest?: RequestLogger; maxSeriesLookups?: number } = {}) {
     super(options.onRequest);
@@ -96,35 +149,74 @@ export class CricketDataAdapter extends BaseProviderAdapter implements SportsPro
   }
 
   /**
-   * `getCompetitions`/`getFixtures`/`getVenues`/`getTeams`/`getPlayers` all
-   * ultimately want "the current matches list" — same doubling problem
-   * OpenF1Adapter's `getReferenceDrivers` TTL cache (Checkpoint 4,
-   * docs/CONTEXT.md §9) fixed for F1's `getTeams`/`getPlayers`, except far
-   * more costly here: this provider's real, confirmed rate limit is
-   * 100 requests/**day** (not OpenF1's ~200/hour — see client.ts's doc
-   * comment), so an ingestion tick that calls several of these methods
-   * back-to-back without this cache would burn through a meaningful
-   * fraction of a whole day's quota on ONE tick. 5 minutes, not
-   * OpenF1's-equivalent, because Cricket's ingestion cadence itself is
-   * necessarily much coarser (apps/ingestion's Cricket config polls on
-   * the order of tens of minutes, not seconds) — this only needs to
-   * survive one tick's worth of same-cadence calls, not bridge a gap
-   * between independent polling loops.
+   * The single-flight cache primitive every `getCached*`/`fetch*` method
+   * below builds on. Deliberately a plain (non-`async`) method — the
+   * *lack* of an `await` before `this.requestCache.set` below is exactly
+   * what makes concurrent callers safe (see this class's field doc
+   * comment above), not an incidental style choice; making this `async`
+   * would reintroduce the original bug by inserting a microtask boundary
+   * before the cache write.
    */
-  private async getCachedCurrentMatches(method: string) {
+  private cachedRequest<T>(key: string, method: string, fetch: () => Promise<T>): Promise<T> {
     const now = Date.now();
-    if (this.currentMatchesCache && now - this.currentMatchesCache.fetchedAt < CricketDataAdapter.CURRENT_MATCHES_TTL_MS) {
-      return this.currentMatchesCache.response;
+    const cached = this.requestCache.get(key);
+    if (cached && now - cached.fetchedAt < CricketDataAdapter.REQUEST_CACHE_TTL_MS) {
+      return cached.promise as Promise<T>;
     }
-    const response = await this.timed(method, () => this.client.getCurrentMatches());
-    this.currentMatchesCache = { fetchedAt: now, response };
-    return response;
+    const promise = this.timed(method, fetch).then((response) => {
+      // Duck-typed rather than a generic constraint — `CricketDataBallByBallResponse`
+      // genuinely has no `info` field (verified, types.ts), and a generic
+      // constraint requiring one confused inference for that call site
+      // more than it was worth; every response shape that *does* carry
+      // real usage metadata still gets recorded here.
+      const info = (response as { info?: CricketDataResponseInfo }).info;
+      if (info) this.recordUsage(info);
+      return response;
+    });
+    this.requestCache.set(key, { fetchedAt: now, promise });
+    return promise;
+  }
+
+  private recordUsage(info: CricketDataResponseInfo): void {
+    this.lastKnownUsage = { hitsToday: info.hitsToday, hitsLimit: info.hitsLimit, observedAt: Date.now() };
+  }
+
+  /**
+   * Bonus method (not part of `SportsProvider`) — Cricket Checkpoint 4.
+   * `apps/ingestion/src/cricket/job.ts` checks this before spending any
+   * further real requests in a tick, skipping optional/expensive work
+   * once real, provider-reported usage is close to the daily cap. This is
+   * a *reactive* guard, not a perfect preventive one — an honest,
+   * disclosed limitation: it's only as fresh as the last real request
+   * this process happened to make, so a freshly-started process (or a
+   * key shared with other concurrent usage outside this process) can
+   * still begin a tick already close to the limit without this having
+   * observed it yet. See docs/CONTEXT.md's Cricket Checkpoint 4
+   * remediation section for the full reasoning and the alternative
+   * (a persistent, cross-process quota tracker) this deliberately doesn't
+   * build, as overkill for a single-key dev-tier integration.
+   */
+  getRequestBudgetStatus(): { hitsToday: number; hitsLimit: number; observedAt: number } | undefined {
+    return this.lastKnownUsage;
+  }
+
+  private getCachedCurrentMatches(method: string): Promise<CricketDataMatchListResponse> {
+    return this.cachedRequest("currentMatches", method, () => this.client.getCurrentMatches());
+  }
+
+  /** Swallows to `undefined` on failure — same posture as the original per-id `.catch(() => undefined)` in `getCompetitions`, now shared with `getSeasons` via the same cache key so the two never issue duplicate real requests for the same series within the TTL (the real bug this checkpoint's remediation found — see the class doc comment). */
+  private async getCachedSeriesInfo(seriesId: string, method: string): Promise<CricketDataSeriesInfoResponse | undefined> {
+    try {
+      return await this.cachedRequest(`series:${seriesId}`, method, () => this.client.getSeriesInfo(seriesId));
+    } catch {
+      return undefined;
+    }
   }
 
   async getCompetitions(): Promise<Competition[]> {
     const matches = await this.getCachedCurrentMatches("getCompetitions");
     const seriesIds = [...new Set(matches.data.map((m) => m.series_id))].slice(0, this.maxSeriesLookups);
-    const infos = await Promise.all(seriesIds.map((id) => this.client.getSeriesInfo(id).catch(() => undefined)));
+    const infos = await Promise.all(seriesIds.map((id) => this.getCachedSeriesInfo(id, "getCompetitions")));
 
     const competitions: Competition[] = [];
     for (const info of infos) {
@@ -136,8 +228,8 @@ export class CricketDataAdapter extends BaseProviderAdapter implements SportsPro
   async getSeasons(input: { competitionId: string }): Promise<Season[]> {
     const seriesId = seriesIdFromCompetitionId(input.competitionId);
     if (!seriesId) return [];
-    const response = await this.timed("getSeasons", () => this.client.getSeriesInfo(seriesId));
-    if (response.status !== "success" || !response.data) return [];
+    const response = await this.getCachedSeriesInfo(seriesId, "getSeasons");
+    if (!response || response.status !== "success" || !response.data) return [];
     return [normalizeSeason(response.data.info, { competitionId: input.competitionId })];
   }
 
@@ -271,7 +363,12 @@ export class CricketDataAdapter extends BaseProviderAdapter implements SportsPro
     // Best-effort real ball-by-ball — verified real failure mode (a
     // `status:"failure"` body) is handled by normalizeBalls returning [],
     // never by this throwing and taking the whole poll down with it.
-    const bbb = await this.client.getMatchBallByBall(ref.matchId).catch(() => undefined);
+    // Cached (Cricket Checkpoint 4) the same as `match_info`: if a second
+    // session of this same fixture is also active this tick (the real,
+    // documented `endTime`-not-yet-written scenario — see
+    // `activeSessions.ts`), this is what stops both sessions' polls from
+    // each spending their own real `match_bbb` request for the same match.
+    const bbb = await this.fetchBallByBall(ref.matchId, "pollLiveEvents");
     if (bbb) events.push(...normalizeBalls(bbb, { sessionId: input.sessionId, timestamp }));
 
     return events;
@@ -378,25 +475,40 @@ export class CricketDataAdapter extends BaseProviderAdapter implements SportsPro
     return normalizeFixtureDetail(match, { resolveTeamId: buildTeamId });
   }
 
+  /**
+   * `getInningsState`/`getScorecard`/`getRosterForFixture`/
+   * `getFixtureDetail`/`pollLiveEvents`/`getSessions`' fallback path all
+   * want the same real `match_info` for one `matchId` — routed through
+   * `cachedRequest` (this class's field doc comment above has the full
+   * concurrency-safety reasoning). Swallows to `undefined` on failure,
+   * same posture as every other bonus method here — a match this adapter
+   * can't currently fetch info for is a real, expected outcome (a
+   * malformed id, a transient network error), not a reason to crash the
+   * caller.
+   */
   private async fetchMatchInfo(matchId: string, method = "getSessions"): Promise<CricketDataMatchSummary | undefined> {
+    let response: CricketDataMatchInfoResponse;
     try {
-      const response = await this.timed(method, () => this.client.getMatchInfo(matchId));
-      return response.status === "success" ? response.data : undefined;
+      response = await this.cachedRequest(`matchInfo:${matchId}`, method, () => this.client.getMatchInfo(matchId));
+    } catch {
+      return undefined;
+    }
+    return response.status === "success" ? response.data : undefined;
+  }
+
+  /** Same reasoning as `fetchMatchInfo`, for `match_scorecard`. */
+  private async getCachedMatchScorecard(matchId: string, method: string): Promise<CricketDataScorecardResponse | undefined> {
+    try {
+      return await this.cachedRequest(`scorecard:${matchId}`, method, () => this.client.getMatchScorecard(matchId));
     } catch {
       return undefined;
     }
   }
 
-  private async getCachedMatchScorecard(matchId: string, method: string): Promise<CricketDataScorecardResponse | undefined> {
-    const now = Date.now();
-    const cached = this.matchScorecardCache.get(matchId);
-    if (cached && now - cached.fetchedAt < CricketDataAdapter.MATCH_SCORECARD_TTL_MS) {
-      return cached.response;
-    }
+  /** Same reasoning again, for `match_bbb` — see `pollLiveEvents`'s call site for why this one specifically matters (two active sessions of the same fixture sharing one match's ball-by-ball fetch). */
+  private async fetchBallByBall(matchId: string, method: string): Promise<CricketDataBallByBallResponse | undefined> {
     try {
-      const response = await this.timed(method, () => this.client.getMatchScorecard(matchId));
-      this.matchScorecardCache.set(matchId, { fetchedAt: now, response });
-      return response;
+      return await this.cachedRequest(`bbb:${matchId}`, method, () => this.client.getMatchBallByBall(matchId));
     } catch {
       return undefined;
     }

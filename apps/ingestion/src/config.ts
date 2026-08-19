@@ -102,29 +102,42 @@ export const config = {
   cricketDataApiKey: process.env.CRICKETDATA_API_KEY ?? "",
 
   /**
-   * How often the Cricket job re-fetches `currentMatches` and polls active
-   * sessions. Real math against the confirmed 100/day cap: one tick calls
-   * `getCurrentMatches` once (cached — see the adapter's
-   * `getCachedCurrentMatches`) plus one `match_info` call per currently-
-   * live session. Even a single live match polled every 20 minutes is
-   * 72 `match_info` calls/day alone — 30 minutes (this default) keeps a
-   * single live match comfortably under half the daily budget, leaving
-   * headroom for `getInningsState`'s extra `match_scorecard` call (see
-   * `cricketInningsStateIntervalMs`) and normal development/testing
-   * activity sharing the same key. Independently configurable — a
-   * production deployment with its own dedicated key (and likely
-   * Sportmonks Cricket, not this dev-tier provider — see docs/CONTEXT.md,
-   * Checkpoint 7 §7) would tune this down.
+   * How often the Cricket job polls active sessions (and, since discovery
+   * is now free in steady state — see `cricketMetadataRefreshIntervalMs`
+   * below — re-runs current-match discovery). **Real, corrected math**
+   * against the confirmed 100/day cap, after Cricket Checkpoint 4's
+   * request-budget remediation (docs/CONTEXT.md has the full audit this
+   * replaces a previously-wrong estimate with):
+   *
+   * Per active (live) session, per tick: `pollLiveEvents` makes exactly 2
+   * real requests (`match_info` + `match_bbb` — both were already being
+   * made; neither was ever "free", unlike what an earlier version of this
+   * comment implied). 30 minutes (this default) → 48 ticks/day → 96
+   * requests/day for ONE continuously-live session, from base polling
+   * alone — already most of the 100/day budget. `cricketMaxActiveSessions`
+   * (below) bounds how many sessions can be live at once; running this
+   * interval any faster, or running more than 1 truly concurrent live
+   * session for a full day, will not fit in the confirmed daily cap on
+   * this dev-tier key — that is a real, honest constraint of the free
+   * provider tier, not something a smarter cache can fix (see
+   * `getRequestBudgetStatus`/`cricketDailyRequestBudget` below for how
+   * this is actually enforced rather than just hoped for).
    */
   cricketPollIntervalMs: Number(process.env.CRICKET_POLL_INTERVAL_MS ?? 30 * 60 * 1000),
 
   /**
-   * How often `getInningsState` (striker/non-striker/current bowler — an
-   * extra real `match_scorecard` call per live session, on top of
-   * `cricketPollIntervalMs`'s `match_info` call) refreshes. Slower than
-   * the base poll interval on purpose — this is enrichment, not the
-   * core score/wicket signal, which `pollLiveEvents` already keeps fresh
-   * every tick from `match_info` alone.
+   * How often `getInningsState`/`getScorecard`/`getRosterForFixture`/
+   * `getFixtureDetail` refresh together (one `Promise.all`, now sharing
+   * exactly one real `match_info` call and one real `match_scorecard`
+   * call thanks to the adapter's request-cache — see
+   * `CricketDataAdapter`'s doc comment; this was the checkpoint's other
+   * real bug — that block used to cost 4 `match_info` calls, not 1).
+   * 2 real requests per refresh, ~24 refreshes/day at this default (60
+   * min — 2x `cricketPollIntervalMs`) → ~48 requests/day per live
+   * fixture, on top of base polling's ~96/day. Slower than the base poll
+   * interval on purpose — this is enrichment (striker/bowler/scorecard),
+   * not the core score/wicket signal, which `pollLiveEvents` already
+   * keeps fresh every base tick from `match_info` alone.
    */
   cricketInningsStateIntervalMs: Number(process.env.CRICKET_INNINGS_STATE_INTERVAL_MS ?? 60 * 60 * 1000),
 
@@ -136,4 +149,57 @@ export const config = {
    * as still live indefinitely.
    */
   cricketMaxSessionDurationMs: Number(process.env.CRICKET_MAX_SESSION_DURATION_MS ?? 12 * 60 * 60 * 1000),
+
+  /**
+   * Cricket Checkpoint 4 — how often `getCompetitions`/`getSeasons` (the
+   * real `series_info`-consuming, slow-changing metadata) re-run.
+   * Competitions/seasons genuinely change on the order of days, not every
+   * poll tick — the original code re-ran both on *every* 30-minute tick
+   * unconditionally, which alone produced roughly 500+ real requests/day
+   * with zero live matches (the single largest, and entirely avoidable,
+   * source of real request volume this pipeline had — see
+   * docs/CONTEXT.md). 6 hours (4x/day) keeps a genuinely new competition/
+   * series discoverable within a bounded, honest window without spending
+   * a meaningful fraction of the daily budget on unchanged reference
+   * data. Current-match *discovery* (fixtures/sessions — free in steady
+   * state) still runs every `cricketPollIntervalMs` tick regardless, so
+   * status changes on already-known fixtures are still picked up
+   * promptly; only *new competitions/series* wait for this longer cycle.
+   */
+  cricketMetadataRefreshIntervalMs: Number(process.env.CRICKET_METADATA_REFRESH_INTERVAL_MS ?? 6 * 60 * 60 * 1000),
+
+  /**
+   * Cricket Checkpoint 4 — the real, confirmed CricketData.org free-tier
+   * daily cap (`info.hitsLimit` on every real response — see client.ts's
+   * doc comment), and how much headroom to keep before it. The job checks
+   * `getRequestBudgetStatus()` (the provider's own live-reported
+   * `hitsToday`) against `cricketDailyRequestBudget -
+   * cricketRequestSafetyMarginRequests` before spending any further real
+   * requests in a tick, and skips them (logging why) once within the
+   * margin — a *reactive* guard based on what THIS process has actually
+   * observed, not a perfect preventive cap shared across processes/keys
+   * (see `CricketDataAdapter.getRequestBudgetStatus`'s doc comment for
+   * that honestly-disclosed limitation). The margin defaults to 10 — not
+   * 0 — so normal development/testing activity sharing the same key
+   * doesn't tip the real usage over 100 the moment this process's own
+   * guard would otherwise still say "go ahead."
+   */
+  cricketDailyRequestBudget: Number(process.env.CRICKETDATA_DAILY_REQUEST_BUDGET ?? 100),
+  cricketRequestSafetyMarginRequests: Number(process.env.CRICKETDATA_REQUEST_SAFETY_MARGIN ?? 10),
+
+  /**
+   * Cricket Checkpoint 4 — a hard cap on how many Cricket sessions this
+   * process will poll concurrently, however many the database currently
+   * classifies "live". Without this, request volume scales linearly and
+   * unbounded with concurrent live matches (a real, confirmed risk — a
+   * single real `currentMatches` snapshot this project captured had 18
+   * matches in flight at once). 3 by default: per `cricketPollIntervalMs`'s
+   * own math, even 1 fully-live session for a full day is already close
+   * to the daily budget, so 3 is a deliberately conservative dev-tier
+   * ceiling, not a claim that 3 concurrent live matches comfortably fit
+   * the budget — `getActiveCricketSessions` (activeSessions.ts) applies
+   * this deterministically (earliest-started sessions first) and logs
+   * when it skips lower-priority ones.
+   */
+  cricketMaxActiveSessions: Number(process.env.CRICKET_MAX_ACTIVE_SESSIONS ?? 3),
 };

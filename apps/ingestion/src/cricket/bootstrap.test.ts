@@ -12,7 +12,7 @@ import type {
   Venue,
 } from "@sports/domain";
 import type { SportsProvider } from "@sports/providers-core";
-import { bootstrapCricketCurrent } from "./bootstrap";
+import { bootstrapCricketCurrent, bootstrapCricketDiscovery, bootstrapCricketMetadata } from "./bootstrap";
 
 /**
  * Integration test — requires the real local Postgres, same pattern as
@@ -154,5 +154,106 @@ describe("bootstrapCricketCurrent (integration, real Postgres)", () => {
 
     fixtures[0].status = "live"; // restore for other tests
     await bootstrapCricketCurrent(provider);
+  });
+});
+
+/**
+ * Cricket Checkpoint 4 (request-budget remediation) — the real, quantified
+ * bug this checkpoint fixed: the original `bootstrapCricketCurrent` was
+ * one function ingestion had no way to call "half of" — `job.ts` had to
+ * either re-run the whole thing (competitions+seasons+venues+teams+
+ * fixtures+sessions) every tick, or nothing. These tests exist to prove
+ * the split actually has the property that makes the fix possible:
+ * `bootstrapCricketDiscovery` alone never calls `getCompetitions`/
+ * `getSeasons` (the real `series_info`-consuming, slow-changing calls),
+ * and `bootstrapCricketMetadata` alone never calls the per-fixture
+ * discovery methods — so `job.ts` can run metadata on a long TTL and
+ * discovery every tick, exactly as intended.
+ */
+describe("bootstrapCricketMetadata / bootstrapCricketDiscovery (integration, real Postgres)", () => {
+  afterAll(cleanup);
+
+  function countingProvider() {
+    const calls = { getCompetitions: 0, getSeasons: 0, getVenues: 0, getTeams: 0, getFixtures: 0, getSessions: 0 };
+    const base = new TestCricketProvider();
+    const provider: SportsProvider = {
+      id: base.id,
+      sportId: base.sportId,
+      getCompetitions: async () => {
+        calls.getCompetitions += 1;
+        return base.getCompetitions();
+      },
+      getSeasons: async () => {
+        calls.getSeasons += 1;
+        return base.getSeasons();
+      },
+      getVenues: async () => {
+        calls.getVenues += 1;
+        return base.getVenues();
+      },
+      getTeams: async () => {
+        calls.getTeams += 1;
+        return base.getTeams();
+      },
+      getFixtures: async () => {
+        calls.getFixtures += 1;
+        return base.getFixtures();
+      },
+      getSessions: async (input: { fixtureId: string }) => {
+        calls.getSessions += 1;
+        return base.getSessions(input);
+      },
+      getPlayers: () => base.getPlayers(),
+      getStandings: () => base.getStandings(),
+      pollLiveEvents: () => base.pollLiveEvents(),
+    };
+    return { provider, calls };
+  }
+
+  it("bootstrapCricketMetadata never calls the discovery methods (venues/teams/fixtures/sessions)", async () => {
+    await cleanup();
+    const { provider, calls } = countingProvider();
+    const metadata = await bootstrapCricketMetadata(provider);
+
+    expect(metadata.competitions).toBe(1);
+    expect(metadata.seasons).toBe(1);
+    expect(metadata.pairs).toEqual([{ competitionId: competition.id, seasonId: season.id }]);
+    expect(calls.getVenues).toBe(0);
+    expect(calls.getTeams).toBe(0);
+    expect(calls.getFixtures).toBe(0);
+    expect(calls.getSessions).toBe(0);
+
+    await prisma.season.deleteMany({ where: { id: season.id } });
+    await prisma.competition.deleteMany({ where: { id: competition.id } });
+  });
+
+  it("bootstrapCricketDiscovery, given known pairs, never calls getCompetitions/getSeasons", async () => {
+    await cleanup();
+    const { provider, calls } = countingProvider();
+    // Metadata must exist first (real FK requirement — Fixture.competitionId/seasonId), but not counted here.
+    const metadata = await bootstrapCricketMetadata(provider);
+    calls.getCompetitions = 0;
+    calls.getSeasons = 0;
+
+    const discovery = await bootstrapCricketDiscovery(provider, metadata.pairs);
+
+    expect(discovery).toEqual({ venues: 1, teams: 2, fixtures: 1, sessions: 2 });
+    expect(calls.getCompetitions).toBe(0);
+    expect(calls.getSeasons).toBe(0);
+  });
+
+  it("running bootstrapCricketDiscovery repeatedly (simulating many poll ticks) never re-issues getCompetitions/getSeasons — the real fix for the ~500 requests/day bootstrap-on-every-tick bug", async () => {
+    await cleanup();
+    const { provider, calls } = countingProvider();
+    const metadata = await bootstrapCricketMetadata(provider);
+    calls.getCompetitions = 0;
+    calls.getSeasons = 0;
+
+    for (let i = 0; i < 10; i++) {
+      await bootstrapCricketDiscovery(provider, metadata.pairs);
+    }
+
+    expect(calls.getCompetitions).toBe(0);
+    expect(calls.getSeasons).toBe(0);
   });
 });

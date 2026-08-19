@@ -164,13 +164,20 @@ describe("Cricket routes (integration, real Postgres)", () => {
     await cleanup();
   });
 
-  it("GET /api/cricket/fixtures includes the seeded fixture with its venue and competition", async () => {
+  it("GET /api/cricket/fixtures includes the seeded fixture with its venue and competition — and the competition object is exactly {id, name, type}, no Prisma-internal fields leaked", async () => {
     const res = await app.inject({ method: "GET", url: "/api/cricket/fixtures" });
     expect(res.statusCode).toBe(200);
     const fixture = res.json().fixtures.find((f: { id: string }) => f.id === FIXTURE_ID);
     expect(fixture).toBeDefined();
     expect(fixture.venue).toMatchObject({ name: "Test Ground, Test City", country: null });
     expect(fixture.competition).toMatchObject({ name: "Test Series 2099", type: "tournament" });
+    // Real leak found in review (Cricket Checkpoint 4): `include: { competition:
+    // true }` fetches the full Prisma row (id, sportId, slug, name, type),
+    // and a bare `competition: fixture.competition` passthrough put all
+    // of it in the response — `sportId`/`slug` have no product meaning to
+    // a client. Asserting the exact key set, not just toMatchObject
+    // (which is subset-tolerant and would never have caught this).
+    expect(Object.keys(fixture.competition).sort()).toEqual(["id", "name", "type"]);
   });
 
   it("GET /api/cricket/fixtures/:id returns the fixture with sessions and real toss/format detail", async () => {
@@ -179,6 +186,7 @@ describe("Cricket routes (integration, real Postgres)", () => {
     const body = res.json();
     expect(body.fixture.id).toBe(FIXTURE_ID);
     expect(body.fixture.competition).toMatchObject({ name: "Test Series 2099" });
+    expect(Object.keys(body.fixture.competition).sort()).toEqual(["id", "name", "type"]);
     expect(body.sessions.map((s: { id: string }) => s.id)).toEqual([SESSION_ID, LIVE_SESSION_ID, SESSION_NO_STATE_ID]);
     expect(body.detail).toMatchObject({ format: "T20", tossDecision: "BAT" });
     expect(body.detail.tossWonByTeam.name).toBe("Test Team A");
@@ -189,11 +197,15 @@ describe("Cricket routes (integration, real Postgres)", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("GET /api/cricket/sessions/:id reports lifecycle=completed and freshness=offline for a finished innings", async () => {
+  it("GET /api/cricket/sessions/:id reports lifecycle=completed and freshness=offline for a finished innings, with the same leak-free competition shape", async () => {
     const res = await app.inject({ method: "GET", url: `/api/cricket/sessions/${SESSION_ID}` });
     const body = res.json();
     expect(body.session.lifecycle).toBe("completed");
     expect(body.freshness.state).toBe("offline");
+    // Real gap found in review: this route was previously untested for the
+    // competition leak entirely (it also calls toFixtureSummary, via
+    // session.fixture).
+    expect(Object.keys(body.fixture.competition).sort()).toEqual(["id", "name", "type"]);
   });
 
   it("GET /api/cricket/sessions/:id/innings returns real current state with real batsmen/bowler names joined", async () => {
@@ -251,15 +263,24 @@ describe("Cricket routes (integration, real Postgres)", () => {
     }
   });
 
-  it("never leaks a raw CricketData.org field name anywhere in a Cricket response body", async () => {
+  it("never leaks a raw CricketData.org field name, or a Prisma-internal field name, anywhere in a Cricket response body", async () => {
+    // Broadened in review (Cricket Checkpoint 4): now covers every route
+    // (previously `/sessions/:id` and `/sessions/:id/events` were
+    // excluded from this comprehensive check — a real, found gap, not
+    // just the 3-term regex `/sessions/:id/events` had on its own below)
+    // and checks for Prisma-internal field names, not just vendor ones —
+    // `"sportId":` is exactly the shape the real competition leak took.
     for (const url of [
       "/api/cricket/fixtures",
       `/api/cricket/fixtures/${FIXTURE_ID}`,
+      `/api/cricket/sessions/${SESSION_ID}`,
       `/api/cricket/sessions/${SESSION_ID}/innings`,
       `/api/cricket/sessions/${SESSION_ID}/scorecard`,
+      `/api/cricket/sessions/${SESSION_ID}/events`,
     ]) {
       const res = await app.inject({ method: "GET", url });
-      expect(res.body).not.toMatch(/dateTimeGMT|matchStarted|matchEnded|tossChoice|cricbuzz_id/);
+      expect(res.body).not.toMatch(/dateTimeGMT|matchStarted|matchEnded|tossChoice|cricbuzz_id|apikey|hitsLimit|hitsToday|series_id/);
+      expect(res.body).not.toMatch(/"sportId"|"competitionId"|"seasonId"|"venueId"|"fixtureId"/);
     }
   });
 });

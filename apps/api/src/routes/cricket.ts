@@ -306,7 +306,16 @@ function toFixtureSummary(fixture: {
     status: fixture.status,
     startTime: fixture.startTime.toISOString(),
     venue: fixture.venue,
-    competition: fixture.competition,
+    // Picked explicitly, not `competition: fixture.competition` — a real
+    // contract leak found in review (Cricket Checkpoint 4): the Prisma
+    // `Competition` row also carries `sportId`/`slug`, neither of which
+    // has any product meaning to a client, and a bare passthrough put
+    // both in every fixture-shaped response body. `venue` has no such
+    // extra columns to leak today, but is left as a passthrough
+    // deliberately unchanged here rather than touched speculatively.
+    competition: fixture.competition
+      ? { id: fixture.competition.id, name: fixture.competition.name, type: fixture.competition.type }
+      : null,
   };
 }
 
