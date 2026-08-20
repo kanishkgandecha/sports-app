@@ -148,7 +148,7 @@ export async function runCricketTickOnce(provider: SportsProvider, state: Cricke
   try {
     const sessions = await prisma.session.findMany({
       where: { fixture: { sport: { slug: provider.sportId } } },
-      select: { id: true, startTime: true, endTime: true },
+      select: { id: true, status: true, startTime: true, endTime: true },
     });
     await pollActiveCricketSessions(provider, getActiveCricketSessions(sessions), state.cursors, state.lastStateRefresh);
   } catch (error) {

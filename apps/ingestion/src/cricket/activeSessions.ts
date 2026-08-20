@@ -24,12 +24,23 @@ import { classifySessionState, type SessionForScheduling, type ActiveSessionTarg
  * is logged with which one and why — never a silent drop.
  */
 export function getActiveCricketSessions(
-  sessions: SessionForScheduling[],
+  // Prisma's generated enum scalar is typed as `string` at this app
+  // boundary. Unknown values are deliberately not treated as live below.
+  sessions: Array<SessionForScheduling & { status: string }>,
   now: Date = new Date(),
 ): ActiveSessionTarget[] {
   const live = sessions
-    .filter((session) => classifySessionState(session, now, config.cricketMaxSessionDurationMs) === "live")
-    .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+    // CricketData.org has no innings-specific timestamps, so each innings
+    // shares the match start time. Its normalized per-innings status is the
+    // authoritative lifecycle signal: prior score[] entries are completed;
+    // only the final, in-progress entry is live. Wall-clock classification
+    // remains a safety bound for stale/corrupt records, not the sole source
+    // of truth as it is for F1.
+    .filter(
+      (session) =>
+        session.status === "live" && classifySessionState(session, now, config.cricketMaxSessionDurationMs) === "live",
+    )
+    .sort((a, b) => a.startTime.getTime() - b.startTime.getTime() || a.id.localeCompare(b.id));
 
   const selected = live.slice(0, config.cricketMaxActiveSessions);
   const skipped = live.slice(config.cricketMaxActiveSessions);
@@ -44,7 +55,7 @@ export function getActiveCricketSessions(
     const minutesRunning = Math.round((now.getTime() - session.startTime.getTime()) / 60000);
     return {
       sessionId: session.id,
-      reason: `innings started ${minutesRunning}min ago and hasn't reached its end time`,
+      reason: `provider-normalized innings status is live; started ${minutesRunning}min ago and hasn't reached its end time`,
       pollIntervalMs: config.cricketPollIntervalMs,
     };
   });

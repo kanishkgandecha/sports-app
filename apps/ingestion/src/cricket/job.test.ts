@@ -13,6 +13,7 @@ import { initialCricketTickState, pollActiveCricketSessions, runCricketTickOnce 
  * offline w.r.t. CricketData.org.
  */
 const SPORT_SLUG = "cricket-test-job";
+const COMPLETED_SIBLING_ID = "cricket-completed-sibling";
 
 class FaultyProvider implements SportsProvider {
   readonly id = "test-faulty-cricket";
@@ -54,7 +55,7 @@ class FaultyProvider implements SportsProvider {
 async function cleanup() {
   const sport = await prisma.sport.findUnique({ where: { slug: SPORT_SLUG } });
   if (sport) await prisma.liveEvent.deleteMany({ where: { sportId: sport.id } });
-  await prisma.session.deleteMany({ where: { id: "cricket-good" } });
+  await prisma.session.deleteMany({ where: { id: { in: ["cricket-good", COMPLETED_SIBLING_ID] } } });
   await prisma.fixture.deleteMany({ where: { id: "cricket-job-test-fixture" } });
   await prisma.season.deleteMany({ where: { id: "cricket-job-test-season" } });
   await prisma.competition.deleteMany({ where: { id: "cricket-job-test-competition" } });
@@ -249,6 +250,21 @@ describe("Cricket Checkpoint 4 — request-budget guard (integration, real Postg
       update: {},
       create: { id: "cricket-good", fixtureId: fixture.id, type: "1ST_INNINGS", status: "live", startTime: new Date(Date.now() - 10 * 60 * 1000), endTime: null },
     });
+    await prisma.session.upsert({
+      where: { id: COMPLETED_SIBLING_ID },
+      update: {},
+      // Same start time/no end time as the active innings: this mirrors the
+      // real CricketData.org limitation. Its persisted normalized status,
+      // not the timestamp, must keep it out of polling.
+      create: {
+        id: COMPLETED_SIBLING_ID,
+        fixtureId: fixture.id,
+        type: "2ND_INNINGS",
+        status: "completed",
+        startTime: new Date(Date.now() - 10 * 60 * 1000),
+        endTime: null,
+      },
+    });
   });
   afterAll(cleanup);
 
@@ -290,6 +306,22 @@ describe("Cricket Checkpoint 4 — request-budget guard (integration, real Postg
   });
 
   describe("runCricketTickOnce — request-budget guard skips the whole tick, not just polling", () => {
+  it("polls only the normalized-live innings of a fixture, avoiding a completed sibling poll", async () => {
+    const calls: string[] = [];
+    class SelectionCountingProvider extends FaultyProvider {
+      override async pollLiveEvents(input: { sessionId: string }) {
+        calls.push(input.sessionId);
+        return super.pollLiveEvents(input);
+      }
+    }
+
+    await runCricketTickOnce(new SelectionCountingProvider(), initialCricketTickState());
+    expect(calls).toEqual(["cricket-good"]);
+    // This is the request-volume regression assertion: one session poll
+    // reaches the provider for this fixture, never one per sibling innings.
+    expect(calls).toHaveLength(1);
+  });
+
   it("under budget: bootstrap and polling both run normally", async () => {
     const provider = new BudgetReportingFaultyProvider(5);
     const state = initialCricketTickState();

@@ -231,8 +231,16 @@ export async function cricketRoutes(app: FastifyInstance) {
  */
 const CRICKET_MAX_SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
 
-function isCricketSessionLive(session: { startTime: Date; endTime: Date | null }): boolean {
+/**
+ * CricketData.org does not provide innings-specific timestamps. A completed
+ * sibling and an active innings therefore share the match start time, so
+ * Cricket's normalized per-innings status is authoritative; time remains a
+ * stale-record safety bound. This intentionally differs from F1, where the
+ * provider session time range is the authoritative lifecycle data.
+ */
+function isCricketSessionLive(session: { status: string; startTime: Date; endTime: Date | null }): boolean {
   return (
+    session.status === "live" &&
     classifySessionLifecycle(
       { startTime: session.startTime.toISOString(), endTime: session.endTime ? session.endTime.toISOString() : null },
       new Date(),
@@ -324,11 +332,11 @@ function toSessionSummary(session: { id: string; type: string; status: string; s
     id: session.id,
     type: session.type,
     status: session.status,
-    lifecycle: classifySessionLifecycle(
-      { startTime: session.startTime.toISOString(), endTime: session.endTime ? session.endTime.toISOString() : null },
-      new Date(),
-      CRICKET_MAX_SESSION_DURATION_MS,
-    ),
+    lifecycle: isCricketSessionLive(session)
+      ? "live"
+      : session.status === "scheduled"
+        ? "upcoming"
+        : "completed",
     startTime: session.startTime.toISOString(),
     endTime: session.endTime ? session.endTime.toISOString() : null,
   };

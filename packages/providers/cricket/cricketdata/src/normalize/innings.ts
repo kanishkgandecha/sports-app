@@ -54,12 +54,20 @@ export function deriveInningsTeamOrder(
  * innings entry only appears once the previous one ends) — verified: a
  * real match's `score[]` grew a second entry the moment the first
  * innings's `w` reached 10, never before. The last entry's status follows
- * the match's own derived status.
+ * the match's own derived status, except the captured provider status
+ * `"Innings Break"`: it authoritatively says the sole/latest innings is
+ * complete and the next has not started, so there is no pollable session.
  */
-function deriveSessionStatus(fixtureStatus: ReturnType<typeof deriveFixtureStatus>, isLastInnings: boolean): SessionStatus {
+function deriveSessionStatus(
+  fixtureStatus: ReturnType<typeof deriveFixtureStatus>,
+  isLastInnings: boolean,
+  providerStatus: string,
+): SessionStatus {
   if (!isLastInnings) return "completed";
+  if (providerStatus.trim().toLowerCase() === "innings break") return "completed";
   if (fixtureStatus === "completed") return "completed";
   if (fixtureStatus === "cancelled" || fixtureStatus === "postponed") return "cancelled";
+  if (fixtureStatus === "scheduled") return "scheduled";
   return "live";
 }
 
@@ -79,7 +87,7 @@ export function normalizeSessions(match: CricketDataMatchSummary): Session[] {
       // over it (same resilience posture as OpenF1Adapter's
       // mapSessionType fallback).
       type: SESSION_TYPE_BY_INNINGS[innings] ?? `INNINGS_${innings}`,
-      status: deriveSessionStatus(fixtureStatus, index === entries.length - 1),
+      status: deriveSessionStatus(fixtureStatus, index === entries.length - 1, match.status),
       // No per-innings start time in this provider's data — the match's
       // own start time is reused for every innings, a documented
       // limitation (see docs/CONTEXT.md), not a fabricated per-innings

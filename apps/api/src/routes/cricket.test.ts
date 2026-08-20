@@ -59,11 +59,14 @@ async function seed() {
       venueId: venue.id,
     },
   });
-  // A completed innings — used for scorecard/events assertions.
+  // A completed sibling innings with the same recent match start time as
+  // the active second innings. CricketData.org does not provide per-innings
+  // timestamps, so this guards against presenting the completed scorecard
+  // as live merely because its fixture remains active.
   await prisma.session.upsert({
     where: { id: SESSION_ID },
     update: {},
-    create: { id: SESSION_ID, fixtureId: FIXTURE_ID, type: "1ST_INNINGS", status: "completed", startTime: new Date("2020-01-01T00:00:00Z"), endTime: new Date("2020-01-01T04:00:00Z") },
+    create: { id: SESSION_ID, fixtureId: FIXTURE_ID, type: "1ST_INNINGS", status: "completed", startTime: new Date(Date.now() - 30 * 60 * 1000), endTime: null },
   });
   // A currently-live innings with no CricketInningsState yet (ingestion hasn't refreshed it) — used for honest-null assertions.
   await prisma.session.upsert({
@@ -188,6 +191,8 @@ describe("Cricket routes (integration, real Postgres)", () => {
     expect(body.fixture.competition).toMatchObject({ name: "Test Series 2099" });
     expect(Object.keys(body.fixture.competition).sort()).toEqual(["id", "name", "type"]);
     expect(body.sessions.map((s: { id: string }) => s.id)).toEqual([SESSION_ID, LIVE_SESSION_ID, SESSION_NO_STATE_ID]);
+    expect(body.sessions.find((s: { id: string }) => s.id === SESSION_ID).lifecycle).toBe("completed");
+    expect(body.sessions.find((s: { id: string }) => s.id === LIVE_SESSION_ID).lifecycle).toBe("live");
     expect(body.detail).toMatchObject({ format: "T20", tossDecision: "BAT" });
     expect(body.detail.tossWonByTeam.name).toBe("Test Team A");
   });

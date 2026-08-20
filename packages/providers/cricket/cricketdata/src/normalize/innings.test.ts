@@ -9,6 +9,7 @@ import awardedMatchInfo from "../fixtures/matchInfo.awarded.json";
 
 const matches = currentMatchesFixture.data as CricketDataMatchSummary[];
 const completedT20 = matches.find((m) => m.id === "793fd4ac-a2ee-4ca7-90ec-63743393d32e")!;
+const inningsBreakSummary = matches.find((m) => m.id === "e9d200fb-3c43-4852-9c93-9160517d7b36")!;
 // The real match_info detail (has tossWinner/tossChoice + 2 real score entries — the list summary for this same match only had 1).
 const inningsBreakMatch = inningsBreakInfo.data as CricketDataMatchSummary;
 const awardedMatch = awardedMatchInfo.data as CricketDataMatchSummary;
@@ -58,6 +59,21 @@ describe("normalizeSessions — real matches", () => {
   it("marks the last innings as completed for a real finished match, even with matchEnded:false (the awarded case)", () => {
     const sessions = normalizeSessions(awardedMatch);
     expect(sessions.at(-1)?.status).toBe("completed");
+  });
+
+  it("marks the captured authoritative Innings Break entry completed, leaving no pollable innings between innings", () => {
+    expect(inningsBreakSummary.status).toBe("Innings Break");
+    expect(normalizeSessions(inningsBreakSummary)).toMatchObject([{ status: "completed" }]);
+  });
+
+  it("keeps an unstarted match's score entry scheduled rather than inventing a live innings", () => {
+    const anomalousUpcoming = {
+      ...inningsBreakSummary,
+      status: "Toss pending",
+      matchStarted: false,
+      score: [{ r: 0, w: 0, o: 0, inning: "not started" }],
+    };
+    expect(normalizeSessions(anomalousUpcoming)).toMatchObject([{ status: "scheduled" }]);
   });
 });
 

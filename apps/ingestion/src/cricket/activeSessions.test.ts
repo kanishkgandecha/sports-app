@@ -4,10 +4,15 @@ import { config } from "../config";
 
 const HOUR = 60 * 60 * 1000;
 
-function session(id: string, startOffsetMs: number, durationMs: number | null = HOUR) {
+function session(
+  id: string,
+  startOffsetMs: number,
+  durationMs: number | null = HOUR,
+  status: "scheduled" | "live" | "completed" | "cancelled" = "live",
+) {
   const startTime = new Date(Date.now() + startOffsetMs);
   const endTime = durationMs === null ? null : new Date(startTime.getTime() + durationMs);
-  return { id, startTime, endTime };
+  return { id, startTime, endTime, status };
 }
 
 /**
@@ -17,13 +22,33 @@ function session(id: string, startOffsetMs: number, durationMs: number | null = 
  * max-session-duration default) and the reason text.
  */
 describe("getActiveCricketSessions", () => {
-  it("selects only the live innings, excluding upcoming and completed ones", () => {
-    const upcoming = session("upcoming", HOUR);
+  it("selects a genuinely active innings while excluding scheduled and completed sessions", () => {
+    const upcoming = session("upcoming", HOUR, HOUR, "scheduled");
     const live = session("live", -30 * 60 * 1000, HOUR);
-    const completed = session("completed", -3 * HOUR, HOUR);
+    const completed = session("completed", -30 * 60 * 1000, HOUR, "completed");
 
     const active = getActiveCricketSessions([upcoming, live, completed]);
     expect(active.map((a) => a.sessionId)).toEqual(["live"]);
+  });
+
+  it("excludes a completed sibling innings that shares the active innings' match start time", () => {
+    const startOffset = -10 * 60 * 1000;
+    const active = getActiveCricketSessions([
+      session("innings-1-completed", startOffset, null, "completed"),
+      session("innings-2-live", startOffset, null, "live"),
+    ]);
+
+    expect(active.map((target) => target.sessionId)).toEqual(["innings-2-live"]);
+  });
+
+  it("does not select completed, cancelled, or scheduled innings even when their timestamps are within the live window", () => {
+    const active = getActiveCricketSessions([
+      session("completed", -10 * 60 * 1000, null, "completed"),
+      session("cancelled", -10 * 60 * 1000, null, "cancelled"),
+      session("scheduled", -10 * 60 * 1000, null, "scheduled"),
+    ]);
+
+    expect(active).toEqual([]);
   });
 
   it("uses Cricket's own, much longer max-session-duration default — a Test innings with no known end time and no endTime, 8 hours in, is still live (F1's 4hr cap would have called this completed)", () => {
@@ -71,6 +96,21 @@ describe("getActiveCricketSessions — cricketMaxActiveSessions cap", () => {
     ];
     const active = getActiveCricketSessions(sessions);
     expect(active.map((a) => a.sessionId)).toEqual(["started-90min-ago", "started-45min-ago", "started-10min-ago"].slice(0, config.cricketMaxActiveSessions));
+  });
+
+  it("breaks equal start-time ties by session id, making cap selection deterministic", () => {
+    const sameStart = -10 * 60_000;
+    const sessions = [
+      session("innings-c", sameStart, HOUR),
+      session("innings-a", sameStart, HOUR),
+      session("innings-b", sameStart, HOUR),
+      session("completed-sibling", sameStart, HOUR, "completed"),
+    ];
+
+    const active = getActiveCricketSessions(sessions);
+    expect(active.map((target) => target.sessionId)).toEqual(
+      ["innings-a", "innings-b", "innings-c"].slice(0, config.cricketMaxActiveSessions),
+    );
   });
 
   it("does not cap or reorder when the number of live sessions is at or under the limit", () => {
