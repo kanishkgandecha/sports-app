@@ -20,7 +20,7 @@
 # this correctly at runtime with no bundler/loader needed — so the final
 # image copies the pruned **source** tree, not just `dist/`.
 
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 RUN corepack enable
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -52,7 +52,7 @@ COPY tsconfig.base.json ./tsconfig.base.json
 RUN turbo run build --filter=@sports/api...
 
 # ---- runtime: minimal, non-root -----------------------------------------
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 RUN addgroup -S sports && adduser -S sports -G sports
 WORKDIR /repo
 COPY --from=builder /repo .
