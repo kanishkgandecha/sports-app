@@ -33,10 +33,7 @@ describe("normalizeVenue", () => {
 
 describe("deriveFixtureStatus", () => {
   it("marks a cancelled meeting as cancelled regardless of dates", () => {
-    const status = deriveFixtureStatus(
-      { ...belgium2024, is_cancelled: true },
-      new Date(belgium2024.date_start),
-    );
+    const status = deriveFixtureStatus({ ...belgium2024, is_cancelled: true }, new Date(belgium2024.date_start));
     expect(status).toBe("cancelled");
   });
 

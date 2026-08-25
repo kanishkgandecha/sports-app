@@ -89,7 +89,13 @@ describe("mergeDriverTimingPatches", () => {
     ];
     const merged = mergeDriverTimingPatches(patches);
     expect(merged).toHaveLength(1);
-    expect(merged[0]).toEqual({ sessionId: "s1", driverId: "d1", position: 3, lastLapTime: 90.5, gapToLeader: "+2.500" });
+    expect(merged[0]).toEqual({
+      sessionId: "s1",
+      driverId: "d1",
+      position: 3,
+      lastLapTime: 90.5,
+      gapToLeader: "+2.500",
+    });
   });
 
   it("keeps separate drivers as separate merged patches", () => {

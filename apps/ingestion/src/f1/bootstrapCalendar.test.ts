@@ -1,16 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { prisma } from "@sports/db";
-import type {
-  Competition,
-  Fixture,
-  LiveEvent,
-  Player,
-  Season,
-  Session,
-  Standing,
-  Team,
-  Venue,
-} from "@sports/domain";
+import type { Competition, Fixture, LiveEvent, Player, Season, Session, Standing, Team, Venue } from "@sports/domain";
 import type { SportsProvider } from "@sports/providers-core";
 import { bootstrapF1Calendar } from "./bootstrapCalendar";
 
@@ -69,22 +59,73 @@ const fixtures: Fixture[] = [
 
 const sessionsByFixture: Record<string, Session[]> = {
   "f1-test-fixture-1": [
-    { id: "f1-test-session-1a", fixtureId: "f1-test-fixture-1", type: "QUALIFYING", status: "scheduled", startTime: "2099-03-01T00:00:00Z", endTime: "2099-03-01T01:00:00Z" },
-    { id: "f1-test-session-1b", fixtureId: "f1-test-fixture-1", type: "RACE", status: "scheduled", startTime: "2099-03-02T00:00:00Z", endTime: "2099-03-02T02:00:00Z" },
+    {
+      id: "f1-test-session-1a",
+      fixtureId: "f1-test-fixture-1",
+      type: "QUALIFYING",
+      status: "scheduled",
+      startTime: "2099-03-01T00:00:00Z",
+      endTime: "2099-03-01T01:00:00Z",
+    },
+    {
+      id: "f1-test-session-1b",
+      fixtureId: "f1-test-fixture-1",
+      type: "RACE",
+      status: "scheduled",
+      startTime: "2099-03-02T00:00:00Z",
+      endTime: "2099-03-02T02:00:00Z",
+    },
   ],
   "f1-test-fixture-2": [
-    { id: "f1-test-session-2a", fixtureId: "f1-test-fixture-2", type: "RACE", status: "scheduled", startTime: "2099-04-01T00:00:00Z", endTime: "2099-04-01T02:00:00Z" },
+    {
+      id: "f1-test-session-2a",
+      fixtureId: "f1-test-fixture-2",
+      type: "RACE",
+      status: "scheduled",
+      startTime: "2099-04-01T00:00:00Z",
+      endTime: "2099-04-01T02:00:00Z",
+    },
   ],
 };
 
 const teams: Team[] = [
-  { id: "f1-test-team-1", sportId: SPORT_ID, name: "Test Team One", slug: "test-team-one", country: null, colorHex: "#FF0000" },
-  { id: "f1-test-team-2", sportId: SPORT_ID, name: "Test Team Two", slug: "test-team-two", country: null, colorHex: "#00FF00" },
+  {
+    id: "f1-test-team-1",
+    sportId: SPORT_ID,
+    name: "Test Team One",
+    slug: "test-team-one",
+    country: null,
+    colorHex: "#FF0000",
+  },
+  {
+    id: "f1-test-team-2",
+    sportId: SPORT_ID,
+    name: "Test Team Two",
+    slug: "test-team-two",
+    country: null,
+    colorHex: "#00FF00",
+  },
 ];
 
 const players: Player[] = [
-  { id: "f1-test-player-1", sportId: SPORT_ID, teamId: "f1-test-team-1", name: "Driver One", role: "driver", shortName: "ONE", avatarUrl: null },
-  { id: "f1-test-player-2", sportId: SPORT_ID, teamId: "f1-test-team-2", name: "Driver Two", role: "driver", shortName: "TWO", avatarUrl: null },
+  {
+    id: "f1-test-player-1",
+    sportId: SPORT_ID,
+    teamId: "f1-test-team-1",
+    name: "Driver One",
+    role: "driver",
+    shortName: "ONE",
+    avatarUrl: null,
+  },
+  {
+    id: "f1-test-player-2",
+    sportId: SPORT_ID,
+    teamId: "f1-test-team-2",
+    name: "Driver Two",
+    role: "driver",
+    shortName: "TWO",
+    avatarUrl: null,
+  },
 ];
 
 class TestSportsProvider implements SportsProvider {
@@ -134,6 +175,7 @@ async function cleanup() {
   await prisma.competition.deleteMany({ where: { id: competition.id } });
   await prisma.player.deleteMany({ where: { id: { in: players.map((p) => p.id) } } });
   await prisma.team.deleteMany({ where: { id: { in: teams.map((t) => t.id) } } });
+  await prisma.sport.deleteMany({ where: { slug: SPORT_ID } });
 }
 
 describe("bootstrapF1Calendar (integration, real Postgres)", () => {

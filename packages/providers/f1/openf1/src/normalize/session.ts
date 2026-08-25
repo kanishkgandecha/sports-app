@@ -19,10 +19,7 @@ export function deriveSessionStatus(session: OpenF1Session, now: Date): SessionS
   return "live";
 }
 
-export function normalizeSession(
-  session: OpenF1Session,
-  input: { fixtureId: string; now?: Date },
-): Session {
+export function normalizeSession(session: OpenF1Session, input: { fixtureId: string; now?: Date }): Session {
   return {
     id: buildSessionId(session.session_key),
     fixtureId: input.fixtureId,

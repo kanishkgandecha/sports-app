@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { TimingTower } from "./TimingTower";
+import styles from "./f1EventCenter.module.css";
 import type { F1TimingRow } from "../../../lib/f1Api";
 
 function row(overrides: Partial<F1TimingRow>): F1TimingRow {
   return {
     position: 1,
-    driver: { id: "d1", name: "Test Driver", shortName: "TST", avatarUrl: null, team: { id: "t1", name: "Test Team", colorHex: "#ff0000" } },
+    driver: {
+      id: "d1",
+      name: "Test Driver",
+      shortName: "TST",
+      avatarUrl: null,
+      team: { id: "t1", name: "Test Team", colorHex: "#ff0000" },
+    },
     gapToLeader: null,
     intervalToAhead: null,
     lastLapTime: null,
@@ -39,8 +46,29 @@ describe("TimingTower", () => {
 
   it("renders real driver/team/tyre data in position order, using tabular formatting", () => {
     const rows = [
-      row({ position: 1, driver: { id: "d1", name: "Leader", shortName: "LDR", avatarUrl: null, team: { id: "t1", name: "Team One", colorHex: "#ff0000" } }, lastLapTime: 88.123, tyreCompound: "SOFT" }),
-      row({ position: 2, driver: { id: "d2", name: "Second", shortName: "SEC", avatarUrl: null, team: { id: "t2", name: "Team Two", colorHex: "#00ff00" } }, gapToLeader: "+2.500" }),
+      row({
+        position: 1,
+        driver: {
+          id: "d1",
+          name: "Leader",
+          shortName: "LDR",
+          avatarUrl: null,
+          team: { id: "t1", name: "Team One", colorHex: "#ff0000" },
+        },
+        lastLapTime: 88.123,
+        tyreCompound: "SOFT",
+      }),
+      row({
+        position: 2,
+        driver: {
+          id: "d2",
+          name: "Second",
+          shortName: "SEC",
+          avatarUrl: null,
+          team: { id: "t2", name: "Team Two", colorHex: "#00ff00" },
+        },
+        gapToLeader: "+2.500",
+      }),
     ];
     render(<TimingTower rows={rows} loading={false} error={false} />);
 
@@ -56,5 +84,24 @@ describe("TimingTower", () => {
   it("never fabricates a value for a missing field — shows an em dash, not 0 or blank", () => {
     render(<TimingTower rows={[row({ gapToLeader: null, lastLapTime: null })]} loading={false} error={false} />);
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  });
+
+  it("gives every column header a scope so screen readers announce it per cell", () => {
+    render(<TimingTower rows={[row({})]} loading={false} error={false} />);
+    for (const header of screen.getAllByRole("columnheader")) {
+      expect(header).toHaveAttribute("scope", "col");
+    }
+  });
+
+  it("flashes a row via the shared LiveValue mechanism (components/LiveValue.tsx) when its position changes", () => {
+    const d1 = { id: "d1", name: "Leader", shortName: "LDR", avatarUrl: null, team: null };
+    const { rerender } = render(
+      <TimingTower rows={[row({ position: 1, driver: d1 })]} loading={false} error={false} />,
+    );
+    const tr = screen.getByText("LDR").closest("tr")!;
+    expect(tr.className).not.toContain(styles.valueChanged);
+
+    rerender(<TimingTower rows={[row({ position: 2, driver: d1 })]} loading={false} error={false} />);
+    expect(tr.className).toContain(styles.valueChanged);
   });
 });

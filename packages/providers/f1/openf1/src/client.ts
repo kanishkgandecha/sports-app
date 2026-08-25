@@ -10,12 +10,14 @@ const BASE_URL = "https://api.openf1.org/v1";
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 1_500;
+const DEFAULT_MAX_RETRY_DELAY_MS = 60_000;
 
 export class OpenF1RequestError extends Error {
   constructor(
     message: string,
     readonly path: string,
     readonly status?: number,
+    readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = "OpenF1RequestError";
@@ -52,6 +54,12 @@ export interface OpenF1ClientOptions {
    */
   maxRetries?: number;
   retryDelayMs?: number;
+  /** Upper bound for exponential/Retry-After waits. */
+  maxRetryDelayMs?: number;
+  /** Injectable only to make retry timing deterministic in tests. */
+  sleep?: (ms: number) => Promise<void>;
+  /** Serializes request starts so composite adapter calls cannot burst the public API. */
+  minRequestIntervalMs?: number;
 }
 
 export class OpenF1FetchClient implements OpenF1HttpClient {
@@ -59,27 +67,53 @@ export class OpenF1FetchClient implements OpenF1HttpClient {
   private readonly fetchImpl: typeof fetch;
   private readonly maxRetries: number;
   private readonly retryDelayMs: number;
+  private readonly maxRetryDelayMs: number;
+  private readonly sleep: (ms: number) => Promise<void>;
+  private readonly minRequestIntervalMs: number;
+  private requestGate: Promise<void> = Promise.resolve();
+  private lastRequestStartedAt = Number.NEGATIVE_INFINITY;
 
   constructor(options: OpenF1ClientOptions = {}) {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+    this.maxRetryDelayMs = options.maxRetryDelayMs ?? DEFAULT_MAX_RETRY_DELAY_MS;
+    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.minRequestIntervalMs = options.minRequestIntervalMs ?? 0;
   }
 
   async get<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T[]> {
     let attempt = 0;
     for (;;) {
       try {
+        await this.waitForRequestSlot();
         return await this.getOnce<T>(path, params);
       } catch (error) {
         const isRateLimit = error instanceof OpenF1RequestError && error.status === 429;
         if (!isRateLimit || attempt >= this.maxRetries) throw error;
         attempt += 1;
-        // Linear backoff (1x, 2x delay) — simple and sufficient for a
-        // handful of retries; this isn't a queueing system.
-        await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs * attempt));
+        const exponentialDelay = this.retryDelayMs * 2 ** (attempt - 1);
+        const requestedDelay = error.retryAfterMs ?? 0;
+        await this.sleep(Math.min(this.maxRetryDelayMs, Math.max(exponentialDelay, requestedDelay)));
       }
+    }
+  }
+
+  private async waitForRequestSlot(): Promise<void> {
+    if (this.minRequestIntervalMs <= 0) return;
+    const previous = this.requestGate;
+    let release!: () => void;
+    this.requestGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const waitMs = Math.max(0, this.lastRequestStartedAt + this.minRequestIntervalMs - Date.now());
+      if (waitMs > 0) await this.sleep(waitMs);
+      this.lastRequestStartedAt = Date.now();
+    } finally {
+      release();
     }
   }
 
@@ -125,15 +159,12 @@ export class OpenF1FetchClient implements OpenF1HttpClient {
         `Rate limited by OpenF1 (429) requesting ${path}`,
         path,
         429,
+        parseRetryAfter(response.headers.get("retry-after")),
       );
     }
 
     if (!response.ok) {
-      throw new OpenF1RequestError(
-        `OpenF1 returned ${response.status} for ${path}`,
-        path,
-        response.status,
-      );
+      throw new OpenF1RequestError(`OpenF1 returned ${response.status} for ${path}`, path, response.status);
     }
 
     try {
@@ -150,4 +181,13 @@ export class OpenF1FetchClient implements OpenF1HttpClient {
       );
     }
   }
+}
+
+function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+  const date = Date.parse(value);
+  if (Number.isNaN(date)) return undefined;
+  return Math.max(0, date - Date.now());
 }

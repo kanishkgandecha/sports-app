@@ -1,0 +1,202 @@
+.shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 56px 0 88px;
+}
+.hero {
+  position: relative;
+  overflow: hidden;
+  padding: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--color-surface), var(--color-surface-raised));
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  right: -8%;
+  top: -70%;
+  width: 42%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--archive-accent);
+  filter: blur(70px);
+  opacity: 0.16;
+}
+.hero h1 {
+  margin: 6px 0 12px;
+  font-size: clamp(2.5rem, 7vw, 5.5rem);
+  letter-spacing: -0.06em;
+  line-height: 0.95;
+}
+.hero p {
+  color: var(--color-text-muted);
+  max-width: 650px;
+}
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+}
+.f1 {
+  --archive-accent: #e10600;
+}
+.sportTabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 28px;
+}
+.sportTabs a {
+  position: relative;
+  z-index: 1;
+  padding: 10px 15px;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  text-decoration: none;
+}
+.sportTabs .activeTab {
+  color: white;
+  border-color: var(--archive-accent);
+  background: color-mix(in srgb, var(--archive-accent) 24%, transparent);
+}
+.filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 24px 0 34px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+.filters label {
+  display: grid;
+  gap: 7px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.filters input,
+.filters select {
+  min-width: 0;
+  padding: 10px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.actions {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+.actions button,
+.actions a,
+.more a {
+  padding: 11px 15px;
+  border: 0;
+  border-radius: 7px;
+  color: white;
+  background: var(--archive-accent);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.actions a {
+  color: var(--color-text-muted);
+  background: transparent;
+}
+.results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.card {
+  display: grid;
+  gap: 12px;
+  min-height: 210px;
+  padding: 22px;
+  color: inherit;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  text-decoration: none;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+a.card:hover {
+  border-color: var(--archive-accent);
+  transform: translateY(-2px);
+}
+.card h2 {
+  margin: 0;
+  font-size: 1.28rem;
+  line-height: 1.25;
+}
+.cardTop,
+.cardBottom {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--color-text-faint);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.cardBottom {
+  align-self: end;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+.coverage {
+  color: var(--archive-accent);
+}
+.meta,
+.teams {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+.empty {
+  margin: 44px 0;
+  color: var(--color-text-muted);
+}
+.more {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+@media (max-width: 780px) {
+  .shell {
+    padding-top: 24px;
+  }
+  .hero {
+    padding: 28px 22px;
+  }
+  .filters {
+    grid-template-columns: 1fr 1fr;
+  }
+  .results {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 480px) {
+  .filters {
+    grid-template-columns: 1fr;
+  }
+  .sportTabs {
+    flex-wrap: wrap;
+  }
+  .cardTop,
+  .cardBottom {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+}

@@ -1,6 +1,5 @@
-// Core schema — see ARCHITECTURE.md §5 for the terminology and reasoning.
-// Sport-specific extension tables (F1 first) are added as their own models
-// below, one phase at a time — never retrofitted into the core tables.
+// Formula 1 data model. The generic event/session names remain useful F1
+// vocabulary while sport-specific timing data stays in extension tables.
 
 generator client {
   provider = "prisma-client-js"
@@ -105,7 +104,7 @@ model Player {
 }
 
 model Fixture {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   sportId       String
   competitionId String
   seasonId      String
@@ -115,15 +114,61 @@ model Fixture {
   startTime     DateTime
   venueId       String?
 
-  sport       Sport       @relation(fields: [sportId], references: [id])
-  competition Competition @relation(fields: [competitionId], references: [id])
-  season      Season      @relation(fields: [seasonId], references: [id])
-  venue       Venue?      @relation(fields: [venueId], references: [id])
+  sport       Sport               @relation(fields: [sportId], references: [id])
+  competition Competition         @relation(fields: [competitionId], references: [id])
+  season      Season              @relation(fields: [seasonId], references: [id])
+  venue       Venue?              @relation(fields: [venueId], references: [id])
   sessions    Session[]
+  dataProfile FixtureDataProfile?
 
   @@unique([sportId, slug])
   @@index([competitionId, status])
   @@index([startTime])
+}
+
+/// Provider provenance and honest data-depth metadata for one imported
+/// fixture. Kept separate from the core Fixture contract: live/current
+/// ingestion predates the historical archive, and source/coverage are
+/// ingestion concerns rather than universal sports-domain fields.
+model FixtureDataProfile {
+  id             String   @id @default(cuid())
+  fixtureId      String   @unique
+  source         String
+  externalId     String
+  coverage       String // "summary" | "event-data"
+  attribution    String?
+  sourceRevision String?
+  datePrecision  String? // "instant" | "day"
+  importedAt     DateTime @default(now())
+
+  fixture Fixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+
+  @@unique([source, externalId])
+  @@index([source, coverage])
+}
+
+/// Resume/audit record for an explicit, bounded historical import. This is
+/// operational metadata only; the archive API reads normalized Fixture data,
+/// never raw import payloads.
+model HistoricalImport {
+  id             String    @id @default(cuid())
+  sportSlug      String
+  source         String
+  scopeKey       String
+  status         String // "running" | "completed" | "failed"
+  sourceRevision String?
+  checksum       String?
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  importedCount  Int       @default(0)
+  skippedCount   Int       @default(0)
+  failedCount    Int       @default(0)
+  error          String?
+  metadata       Json      @default("{}")
+
+  @@unique([source, scopeKey])
+  @@index([sportSlug, startedAt])
+  @@index([status])
 }
 
 model Session {
@@ -144,6 +189,9 @@ model Session {
 /// Append-only. Never mutated after insert — corrections arrive as new rows.
 model LiveEvent {
   id        String   @id @default(cuid())
+  /// Database-assigned global order. Provider timestamps can collide or
+  /// arrive late; this is the durable SSE resume cursor.
+  sequence  BigInt   @unique @default(autoincrement())
   sportId   String
   sessionId String
   eventType String
@@ -155,6 +203,7 @@ model LiveEvent {
   session Session @relation(fields: [sessionId], references: [id])
 
   @@index([sessionId, timestamp])
+  @@index([sessionId, sequence])
   @@index([eventType])
 }
 
@@ -178,13 +227,26 @@ model Standing {
 /// Raw provider payloads, retained for debugging/audit only — never the
 /// primary application model (ARCHITECTURE.md §4, master brief §19).
 model ProviderRawResponse {
-  id         String   @id @default(cuid())
-  providerId String
-  method     String
+  id          String   @id @default(cuid())
+  providerId  String
+  method      String
   requestedAt DateTime
-  body       Json
+  body        Json
 
   @@index([providerId, requestedAt])
+}
+
+/// Durable upstream resume position. A worker restart must not turn every
+/// provider poll into an unbounded historical refetch.
+model ProviderCursor {
+  id         String   @id @default(cuid())
+  providerId String
+  sessionId  String
+  cursor     String
+  updatedAt  DateTime @updatedAt
+
+  @@unique([providerId, sessionId])
+  @@index([providerId, updatedAt])
 }
 
 // Education content deliberately has no table here. EducationConcept lives
@@ -220,12 +282,12 @@ model DriverTiming {
 }
 
 model PitStop {
-  id          String   @id @default(cuid())
-  sessionId   String
-  driverId    String
-  lap         Int
-  durationMs  Int
-  timestamp   DateTime
+  id         String   @id @default(cuid())
+  sessionId  String
+  driverId   String
+  lap        Int
+  durationMs Int
+  timestamp  DateTime
 
   @@index([sessionId, driverId])
 }

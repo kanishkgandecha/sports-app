@@ -12,6 +12,7 @@ function session(overrides: Partial<F1Session>): F1Session {
     lifecycle: "upcoming",
     startTime: "2026-01-01T00:00:00Z",
     endTime: null,
+    detailAvailable: true,
     ...overrides,
   };
 }

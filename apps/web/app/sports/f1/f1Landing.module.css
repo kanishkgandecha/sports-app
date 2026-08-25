@@ -1,0 +1,332 @@
+/*
+ * /sports/f1 — the F1 home/landing page (Checkpoint 7). Same token
+ * discipline as every other module; deliberately reuses home.module.css's
+ * hero/feed patterns conceptually (full-bleed hero, bordered list rows)
+ * rather than inventing a third visual language, while carrying real F1-
+ * specific content (session countdown, standings snapshot).
+ */
+
+.hero {
+  position: relative;
+  /* See home.module.css's identical rule for why this is `50% - 50vw`, not
+     the reverse — a real, found-by-screenshot bug (docs/CONTEXT.md
+     Checkpoint 7 §11). */
+  margin: calc(var(--space-7) * -1) calc(50% - 50vw) 0;
+  padding: var(--space-8) var(--space-6);
+  overflow: hidden;
+  border-bottom: 1px solid var(--color-border);
+  background:
+    radial-gradient(55% 60% at 85% -10%, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent 70%),
+    var(--color-bg);
+}
+
+.heroInner {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  width: fit-content;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 4.5vw, var(--font-size-4xl));
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+}
+
+.heroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.countdown {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+.countdownValue {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+}
+
+.countdownLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.heroCta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-data);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--color-text);
+  color: var(--color-bg);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.heroCta:hover {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroCta:hover {
+    transform: none;
+  }
+}
+
+/* ---- sessions strip ------------------------------------------------------ */
+
+.sessionStrip {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.sessionCard {
+  flex: 0 0 auto;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.sessionCardLive {
+  border-color: var(--color-live);
+  background: var(--color-live-soft);
+}
+
+.sessionCardType {
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.sessionCardTime {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- generic section shell ------------------------------------------------ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+}
+
+.sectionLink {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  flex: 0 0 auto;
+}
+
+/* ---- standings snapshot ---------------------------------------------------- */
+
+.standingsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.standingsCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.standingsCardHeader {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-2);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.standingsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+.standingsPos {
+  font-family: var(--font-data);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  width: 1.5em;
+  flex: 0 0 auto;
+}
+
+.standingsSwatch {
+  width: 4px;
+  align-self: stretch;
+  border-radius: var(--radius-full);
+  flex: 0 0 auto;
+}
+
+.standingsName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.standingsPoints {
+  font-family: var(--font-data);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+/* ---- fixture list (results/calendar), reused from home's pattern -------- */
+
+.fixtureList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.fixtureRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.fixtureRow:hover {
+  background: var(--color-surface-2);
+}
+
+.fixtureName {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.fixtureNameText {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fixtureVenue {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fixtureDate {
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- learn strip ------------------------------------------------------------ */
+
+.learnCard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.learnCardText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 52ch;
+}
+
+.learnCardTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+}
+
+.learnCardBody {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 640px) {
+  .title {
+    font-size: var(--font-size-3xl);
+  }
+}

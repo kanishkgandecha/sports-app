@@ -1,6 +1,6 @@
 import type { F1RaceControlMessage } from "../../../lib/f1Api";
 import { StateView } from "../StateView";
-import { EducationTrigger } from "./GlossaryDrawer";
+import { EducationTrigger } from "../../GlossaryDrawer";
 import styles from "./f1EventCenter.module.css";
 
 /** Only categories with a real seeded education concept get a chip — see content/education/f1/. */

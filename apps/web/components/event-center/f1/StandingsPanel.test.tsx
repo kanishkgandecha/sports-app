@@ -76,10 +76,7 @@ describe("StandingsPanel", () => {
   });
 
   it("shows an error state when the standings request fails, not an empty table", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => new Response("error", { status: 500 })) as unknown as typeof fetch,
-    );
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("error", { status: 500 })) as unknown as typeof fetch);
     render(<StandingsPanel year={2026} onExplain={vi.fn()} />);
     await waitFor(() => expect(screen.getAllByRole("alert").length).toBeGreaterThan(0));
   });

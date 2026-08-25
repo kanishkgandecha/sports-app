@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+.pnpm-store
+dist
+**/dist
+.next
+**/.next
+.turbo
+**/.turbo
+coverage
+**/coverage
+*.tsbuildinfo
+.git
+.env
+.env.local
+.DS_Store
+docs

@@ -17,5 +17,84 @@ services:
       timeout: 3s
       retries: 10
 
+  # Checkpoint 7 — apps/api, apps/ingestion, apps/web added below.
+  # `depends_on: condition: service_healthy` on postgres for both services
+  # that touch the database (api runs `prisma migrate deploy` on start —
+  # see apps/api/Dockerfile — so it must never start before Postgres is
+  # actually accepting connections, not merely "container started").
+  # ingestion depends on the API being healthy too — not a hard runtime
+  # requirement (ingestion writes to Postgres directly, not through the
+  # API), but it avoids a noisy startup race where ingestion's first
+  # `pg_notify` fires before the API's LISTEN subscription exists yet.
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: sports-platform-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://sports:sports@postgres:5432/sports_platform_dev
+      API_PORT: 4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: apps/ingestion/Dockerfile
+    container_name: sports-platform-ingestion
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://sports:sports@postgres:5432/sports_platform_dev
+      # F1 bootstrap/poll/standings tuning — same defaults as apps/ingestion/
+      # src/config.ts uses outside Docker; set explicitly here so the
+      # compose file is the readable source of truth for what a fresh stack
+      # actually does, not an implicit fallback the reader has to go find.
+      F1_PROVIDER: openf1
+      F1_STANDINGS_PROVIDER: jolpica
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Browser-reachable origin, baked in at build time — see
+        # apps/web/lib/api.ts and apps/web/Dockerfile's doc comments for
+        # why this can't be a runtime env var. Override at build time
+        # (`docker compose build --build-arg NEXT_PUBLIC_API_URL=...`) for
+        # a deployment where the API isn't published on localhost:4000.
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+    container_name: sports-platform-web
+    restart: unless-stopped
+    environment:
+      # Container-to-container origin for server-side (RSC) data fetching —
+      # a genuine runtime env var (not NEXT_PUBLIC_), see lib/api.ts.
+      API_INTERNAL_URL: http://api:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   sports-platform-db-data:

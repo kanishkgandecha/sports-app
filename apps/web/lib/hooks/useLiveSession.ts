@@ -42,10 +42,12 @@ export function useLiveSession(sessionId: string | null, options: UseLiveSession
   // closure (e.g. from a component re-render) — only sessionId/isLive
   // changes should tear down and reopen the connection.
   const onEventRef = useRef(onEvent);
+  const lastSequenceRef = useRef<string | null>(null);
   onEventRef.current = onEvent;
 
   useEffect(() => {
     setLastEventAt(initialLastEventAt);
+    lastSequenceRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
@@ -66,7 +68,8 @@ export function useLiveSession(sessionId: string | null, options: UseLiveSession
 
     function connect() {
       setConnectionState("connecting");
-      source = new EventSource(`${API_BASE_URL}/api/sessions/${sessionId}/stream`);
+      const after = lastSequenceRef.current ? `?after=${encodeURIComponent(lastSequenceRef.current)}` : "";
+      source = new EventSource(`${API_BASE_URL}/api/sessions/${sessionId}/stream${after}`);
 
       source.addEventListener("ready", () => {
         if (!cancelled) setConnectionState("open");
@@ -80,6 +83,8 @@ export function useLiveSession(sessionId: string | null, options: UseLiveSession
         } catch {
           return; // malformed payload — never crash the live surface over it
         }
+        const sequence = (event as LiveEvent & { sequence?: unknown }).sequence;
+        if (typeof sequence === "string") lastSequenceRef.current = sequence;
         setLastEventAt(event.timestamp);
         onEventRef.current?.(event);
       });

@@ -85,10 +85,7 @@ export function toRaceControlMessageRow(
   };
 }
 
-export function normalizeRaceControlEvent(
-  msg: OpenF1RaceControlMessage,
-  input: { sessionId?: string },
-): LiveEvent {
+export function normalizeRaceControlEvent(msg: OpenF1RaceControlMessage, input: { sessionId?: string }): LiveEvent {
   const sessionId = input.sessionId ?? buildSessionId(msg.session_key);
   const classification = classifyRaceControl(msg);
   const hash = deterministicHash(`${msg.date}|${msg.category}|${msg.message}`);

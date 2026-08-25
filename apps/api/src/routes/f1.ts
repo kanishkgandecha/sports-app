@@ -15,14 +15,32 @@ import { classifySessionLifecycle, computeFreshness, type FreshnessInfo } from "
  * involved, fetch matching `Player` rows once, merge.
  */
 export async function f1Routes(app: FastifyInstance) {
-  app.get<{ Querystring: { status?: string } }>("/api/f1/fixtures", async (req) => {
-    const fixtures = await prisma.fixture.findMany({
-      where: { sport: { slug: "f1" }, ...(req.query.status ? { status: req.query.status } : {}) },
-      orderBy: { startTime: "asc" },
-      include: { venue: true },
-    });
-    return { fixtures: fixtures.map(toFixtureSummary) };
-  });
+  app.get<{ Querystring: { status?: string; limit?: string; order?: string } }>(
+    "/api/f1/fixtures",
+    async (req, reply) => {
+      const limit = req.query.limit === undefined ? 50 : Number(req.query.limit);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+        return reply.code(400).send({ error: "limit must be from 1 to 100" });
+      if (req.query.order && req.query.order !== "asc" && req.query.order !== "desc")
+        return reply.code(400).send({ error: "order must be asc or desc" });
+      const order: "asc" | "desc" = req.query.order === "asc" ? "asc" : "desc";
+      const fixtures = await prisma.fixture.findMany({
+        where: { sport: { slug: "f1" }, ...(req.query.status ? { status: req.query.status } : {}) },
+        orderBy: { startTime: order },
+        take: limit,
+        include: { venue: true, sessions: { select: { id: true } } },
+      });
+      const detailIds = await detailedF1SessionIds(fixtures.flatMap((fixture) => fixture.sessions.map((s) => s.id)));
+      return {
+        fixtures: fixtures.map((fixture) =>
+          toFixtureSummary(
+            fixture,
+            fixture.sessions.some((session) => detailIds.has(session.id)),
+          ),
+        ),
+      };
+    },
+  );
 
   app.get<{ Params: { fixtureId: string } }>("/api/f1/fixtures/:fixtureId", async (req, reply) => {
     const fixture = await prisma.fixture.findFirst({
@@ -34,9 +52,13 @@ export async function f1Routes(app: FastifyInstance) {
       // sport — this route is F1-only, not "any fixture."
       return reply.code(404).send({ error: `No F1 fixture "${req.params.fixtureId}"` });
     }
+    const detailIds = await detailedF1SessionIds(fixture.sessions.map((session) => session.id));
     return {
-      fixture: toFixtureSummary(fixture),
-      sessions: fixture.sessions.map((s) => toSessionSummary(s)),
+      fixture: toFixtureSummary(
+        fixture,
+        fixture.sessions.some((session) => detailIds.has(session.id)),
+      ),
+      sessions: fixture.sessions.map((session) => toSessionSummary(session, detailIds.has(session.id))),
     };
   });
 
@@ -50,9 +72,10 @@ export async function f1Routes(app: FastifyInstance) {
     }
     const isLive = isSessionLive(session);
     const freshness = await getSessionFreshness(session.id, isLive);
+    const detailIds = await detailedF1SessionIds([session.id]);
     return {
-      session: toSessionSummary(session),
-      fixture: toFixtureSummary(session.fixture),
+      session: toSessionSummary(session, detailIds.has(session.id)),
+      fixture: toFixtureSummary(session.fixture, detailIds.has(session.id)),
       freshness,
     };
   });
@@ -285,14 +308,17 @@ function unknownDriver(driverId: string) {
   return { id: driverId, name: driverId, shortName: null, avatarUrl: null, team: null };
 }
 
-function toFixtureSummary(fixture: {
-  id: string;
-  slug: string;
-  name: string;
-  status: string;
-  startTime: Date;
-  venue: { id: string; name: string; country: string; timezone: string } | null;
-}) {
+function toFixtureSummary(
+  fixture: {
+    id: string;
+    slug: string;
+    name: string;
+    status: string;
+    startTime: Date;
+    venue: { id: string; name: string; country: string; timezone: string } | null;
+  },
+  detailAvailable = false,
+) {
   return {
     id: fixture.id,
     slug: fixture.slug,
@@ -300,10 +326,20 @@ function toFixtureSummary(fixture: {
     status: fixture.status,
     startTime: fixture.startTime.toISOString(),
     venue: fixture.venue,
+    detailAvailable,
   };
 }
 
-function toSessionSummary(session: { id: string; type: string; status: string; startTime: Date; endTime: Date | null }) {
+function toSessionSummary(
+  session: {
+    id: string;
+    type: string;
+    status: string;
+    startTime: Date;
+    endTime: Date | null;
+  },
+  detailAvailable = false,
+) {
   return {
     id: session.id,
     type: session.type,
@@ -314,5 +350,33 @@ function toSessionSummary(session: { id: string; type: string; status: string; s
     }),
     startTime: session.startTime.toISOString(),
     endTime: session.endTime ? session.endTime.toISOString() : null,
+    detailAvailable,
   };
+}
+
+async function detailedF1SessionIds(sessionIds: string[]): Promise<Set<string>> {
+  if (sessionIds.length === 0) return new Set();
+  const [timing, pits, raceControl, events] = await Promise.all([
+    prisma.driverTiming.findMany({
+      where: { sessionId: { in: sessionIds } },
+      distinct: ["sessionId"],
+      select: { sessionId: true },
+    }),
+    prisma.pitStop.findMany({
+      where: { sessionId: { in: sessionIds } },
+      distinct: ["sessionId"],
+      select: { sessionId: true },
+    }),
+    prisma.raceControlMessage.findMany({
+      where: { sessionId: { in: sessionIds } },
+      distinct: ["sessionId"],
+      select: { sessionId: true },
+    }),
+    prisma.liveEvent.findMany({
+      where: { sessionId: { in: sessionIds } },
+      distinct: ["sessionId"],
+      select: { sessionId: true },
+    }),
+  ]);
+  return new Set([...timing, ...pits, ...raceControl, ...events].map((row) => row.sessionId));
 }

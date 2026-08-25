@@ -51,6 +51,31 @@ describe("OpenF1FetchClient", () => {
     expect(calls).toBe(2);
   });
 
+  it("uses bounded exponential backoff and honors a longer Retry-After value", async () => {
+    let calls = 0;
+    const delays: number[] = [];
+    const fetchImpl = fakeFetch(() => {
+      calls += 1;
+      if (calls === 1) return new Response("", { status: 429 });
+      if (calls === 2) return new Response("", { status: 429, headers: { "retry-after": "8" } });
+      if (calls === 3) return new Response("", { status: 429, headers: { "retry-after": "120" } });
+      return jsonResponse([{ ok: true }]);
+    });
+    const client = new OpenF1FetchClient({
+      fetchImpl,
+      maxRetries: 3,
+      retryDelayMs: 2_000,
+      maxRetryDelayMs: 10_000,
+      sleep: (ms) => {
+        delays.push(ms);
+        return Promise.resolve();
+      },
+    });
+
+    await expect(client.get("/meetings")).resolves.toEqual([{ ok: true }]);
+    expect(delays).toEqual([2_000, 8_000, 10_000]);
+  });
+
   it("does not retry a non-429 error at all", async () => {
     let calls = 0;
     const fetchImpl = fakeFetch(() => {
@@ -60,6 +85,21 @@ describe("OpenF1FetchClient", () => {
     const client = new OpenF1FetchClient({ fetchImpl, maxRetries: 2, retryDelayMs: 0 });
     await expect(client.get("/meetings")).rejects.toThrow(OpenF1RequestError);
     expect(calls).toBe(1);
+  });
+
+  it("serializes concurrent request starts when a minimum interval is configured", async () => {
+    const startedAt: number[] = [];
+    const fetchImpl = fakeFetch(() => {
+      startedAt.push(Date.now());
+      return jsonResponse([]);
+    });
+    const client = new OpenF1FetchClient({ fetchImpl, minRequestIntervalMs: 10 });
+
+    await Promise.all([client.get("/laps"), client.get("/pit"), client.get("/race_control")]);
+
+    expect(startedAt).toHaveLength(3);
+    expect(startedAt[1] - startedAt[0]).toBeGreaterThanOrEqual(8);
+    expect(startedAt[2] - startedAt[1]).toBeGreaterThanOrEqual(8);
   });
 
   it("throws OpenF1RequestError on malformed JSON rather than crashing the process", async () => {

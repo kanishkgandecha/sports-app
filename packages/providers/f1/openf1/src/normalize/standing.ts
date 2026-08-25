@@ -19,9 +19,7 @@ export function normalizeChampionshipEntry(
 ): Standing {
   const entityType: StandingEntityType = entry.driver_number !== undefined ? "player" : "team";
   const entityId =
-    entry.driver_number !== undefined
-      ? buildDriverId(entry.driver_number)
-      : buildTeamId(entry.team_name ?? "unknown");
+    entry.driver_number !== undefined ? buildDriverId(entry.driver_number) : buildTeamId(entry.team_name ?? "unknown");
 
   return {
     id: `openf1-standing-${entry.session_key}-${entityType}-${entityId}`,

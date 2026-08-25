@@ -4,14 +4,7 @@
  * race weekend.
  */
 
-export type F1SessionType =
-  | "FP1"
-  | "FP2"
-  | "FP3"
-  | "QUALIFYING"
-  | "SPRINT_QUALIFYING"
-  | "SPRINT"
-  | "RACE";
+export type F1SessionType = "FP1" | "FP2" | "FP3" | "QUALIFYING" | "SPRINT_QUALIFYING" | "SPRINT" | "RACE";
 
 export type TyreCompound = "SOFT" | "MEDIUM" | "HARD" | "INTERMEDIATE" | "WET";
 

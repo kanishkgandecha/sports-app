@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GlossaryDrawer } from "./GlossaryDrawer";
-import { apiGet } from "../../../lib/api";
+import { apiGet } from "../lib/api";
 
-vi.mock("../../../lib/api", () => ({ apiGet: vi.fn() }));
+vi.mock("../lib/api", () => ({ apiGet: vi.fn() }));
 const mockApiGet = vi.mocked(apiGet);
 
 const SAFETY_CAR_RESPONSE = {
@@ -69,6 +69,28 @@ describe("GlossaryDrawer", () => {
     render(<GlossaryDrawer slug="what-is-f1" onClose={vi.fn()} onNavigate={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole("heading", { name: "What is Formula 1?" })).toBeInTheDocument());
     expect(screen.getAllByText("Grand Prix")).toHaveLength(1);
+  });
+
+  it("moves focus to the Close button on open (Checkpoint 7 — a dialog that opens without moving focus traps a keyboard user)", async () => {
+    mockApiGet.mockResolvedValueOnce(SAFETY_CAR_RESPONSE);
+    render(<GlossaryDrawer slug="safety-car" onClose={vi.fn()} onNavigate={vi.fn()} />);
+    expect(screen.getByText("Close")).toHaveFocus();
+  });
+
+  it("restores focus to whatever triggered it once the drawer unmounts", async () => {
+    mockApiGet.mockResolvedValueOnce(SAFETY_CAR_RESPONSE);
+    const trigger = document.createElement("button");
+    trigger.textContent = "open";
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(trigger).toHaveFocus();
+
+    const { unmount } = render(<GlossaryDrawer slug="safety-car" onClose={vi.fn()} onNavigate={vi.fn()} />);
+    expect(trigger).not.toHaveFocus();
+
+    unmount();
+    expect(trigger).toHaveFocus();
+    trigger.remove();
   });
 
   it("re-fetches when the slug prop changes (navigating within the same drawer instance)", async () => {

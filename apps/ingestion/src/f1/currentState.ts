@@ -44,17 +44,35 @@ export function toRaceControlMessageRow(event: LiveEvent): RaceControlMessageRow
 
   if (event.eventType === "FLAG") {
     const payload = event.payload as unknown as f1.FlagPayload;
-    return { id: event.id, sessionId: event.sessionId, timestamp: event.timestamp, category: "flag", message: payload.message };
+    return {
+      id: event.id,
+      sessionId: event.sessionId,
+      timestamp: event.timestamp,
+      category: "flag",
+      message: payload.message,
+    };
   }
 
   if (event.eventType === "SESSION_STATUS") {
     const payload = event.payload as unknown as f1.SessionStatusPayload;
-    return { id: event.id, sessionId: event.sessionId, timestamp: event.timestamp, category: "message", message: payload.message };
+    return {
+      id: event.id,
+      sessionId: event.sessionId,
+      timestamp: event.timestamp,
+      category: "message",
+      message: payload.message,
+    };
   }
 
   if (event.eventType === "RACE_CONTROL_MESSAGE") {
     const payload = event.payload as unknown as f1.RaceControlMessagePayload;
-    return { id: event.id, sessionId: event.sessionId, timestamp: event.timestamp, category: "message", message: payload.message };
+    return {
+      id: event.id,
+      sessionId: event.sessionId,
+      timestamp: event.timestamp,
+      category: "message",
+      message: payload.message,
+    };
   }
 
   return null;

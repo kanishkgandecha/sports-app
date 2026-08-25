@@ -8,12 +8,7 @@ import { prisma } from "../src/index.js";
  */
 async function main() {
   await prisma.sport.createMany({
-    data: [
-      { slug: "f1", name: "Formula 1", status: "beta" },
-      { slug: "cricket", name: "Cricket", status: "education-only" },
-      { slug: "football", name: "Football", status: "education-only" },
-      { slug: "esports", name: "Esports", status: "education-only" },
-    ],
+    data: [{ slug: "f1", name: "Formula 1", status: "live" }],
     skipDuplicates: true,
   });
 

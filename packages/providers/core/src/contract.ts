@@ -3,8 +3,7 @@ import type { SportsProvider } from "./types";
 
 /**
  * A reusable contract test: run this against every real adapter
- * (F1OpenF1Adapter, CricketSportmonksAdapter, ...) as it's built, so a
- * vendor swap can never silently drop a method the rest of the app relies
+ * against every F1 adapter so a vendor swap can never silently drop a method the rest of the app relies
  * on. Exported from the package (not just a local test file) so other
  * provider packages can import and run it against their own adapter —
  * see packages/providers/f1/openf1/src/adapter.test.ts for the first real

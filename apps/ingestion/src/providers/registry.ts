@@ -22,14 +22,15 @@ export function resolveF1Provider(): SportsProvider | null {
         if (!log.ok) {
           logger.warn({ provider: log.providerId, method: log.method, error: log.error }, "provider request failed");
         } else {
-          logger.debug({ provider: log.providerId, method: log.method, durationMs: log.durationMs }, "provider request");
+          logger.debug(
+            { provider: log.providerId, method: log.method, durationMs: log.durationMs },
+            "provider request",
+          );
         }
       },
     });
   }
-  throw new Error(
-    `Unknown F1_PROVIDER "${config.f1Provider}" — expected "openf1" or "disabled"`,
-  );
+  throw new Error(`Unknown F1_PROVIDER "${config.f1Provider}" — expected "openf1" or "disabled"`);
 }
 
 /**
@@ -52,12 +53,13 @@ export function resolveF1StandingsProvider(): SportsProvider | null {
         if (!log.ok) {
           logger.warn({ provider: log.providerId, method: log.method, error: log.error }, "provider request failed");
         } else {
-          logger.debug({ provider: log.providerId, method: log.method, durationMs: log.durationMs }, "provider request");
+          logger.debug(
+            { provider: log.providerId, method: log.method, durationMs: log.durationMs },
+            "provider request",
+          );
         }
       },
     });
   }
-  throw new Error(
-    `Unknown F1_STANDINGS_PROVIDER "${config.f1StandingsProvider}" — expected "jolpica" or "disabled"`,
-  );
+  throw new Error(`Unknown F1_STANDINGS_PROVIDER "${config.f1StandingsProvider}" — expected "jolpica" or "disabled"`);
 }
