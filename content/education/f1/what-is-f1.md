@@ -4,6 +4,7 @@ title: What is Formula 1?
 difficulty: beginner
 relatedConceptSlugs:
   - grand-prix
+  - championship-points
 relatedEventTypes: []
 precededBy: []
 followedBy:

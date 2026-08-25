@@ -7,6 +7,7 @@ import type {
   Session,
   Standing,
   Team,
+  Venue,
 } from "@sports/domain";
 import type { SportsProvider } from "./types";
 
@@ -65,6 +66,7 @@ export class FakeSportsProvider implements SportsProvider {
     name: "Synthetic Team",
     slug: "synthetic-team",
     country: null,
+    colorHex: null,
   };
 
   private readonly player: Player = {
@@ -73,6 +75,8 @@ export class FakeSportsProvider implements SportsProvider {
     teamId: this.team.id,
     name: "Synthetic Player",
     role: null,
+    shortName: null,
+    avatarUrl: null,
   };
 
   private sequence = 0;
@@ -99,6 +103,11 @@ export class FakeSportsProvider implements SportsProvider {
 
   async getPlayers(): Promise<Player[]> {
     return [this.player];
+  }
+
+  /** The synthetic fixture has no venue (venueId: null) — nothing to return. */
+  async getVenues(): Promise<Venue[]> {
+    return [];
   }
 
   async getStandings(): Promise<Standing[]> {

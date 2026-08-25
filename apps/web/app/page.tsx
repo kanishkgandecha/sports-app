@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { apiGet } from "../lib/api";
+import type { F1Fixture } from "../lib/f1Api";
 import { ConceptChip } from "../components/ConceptChip";
 import { LiveTicker } from "../components/LiveTicker";
 
@@ -19,8 +21,17 @@ async function getSports(): Promise<Sport[]> {
   }
 }
 
+async function getF1Fixtures(): Promise<F1Fixture[]> {
+  try {
+    const { fixtures } = await apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures");
+    return fixtures;
+  } catch {
+    return [];
+  }
+}
+
 export default async function HomePage() {
-  const sports = await getSports();
+  const [sports, fixtures] = await Promise.all([getSports(), getF1Fixtures()]);
 
   return (
     <>
@@ -69,6 +80,65 @@ export default async function HomePage() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+        <h2 style={{ fontSize: "var(--font-size-lg)" }}>Formula 1 — Event Center</h2>
+        {fixtures.length === 0 ? (
+          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)", margin: 0 }}>
+            No F1 fixtures bootstrapped yet — start the ingestion worker (see README) to
+            populate this from the calendar.
+          </p>
+        ) : (
+          <ul
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-2)",
+            }}
+          >
+            {fixtures.map((fixture) => (
+              <li key={fixture.id}>
+                <Link
+                  href={`/events/${fixture.id}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "var(--space-3)",
+                    padding: "var(--space-3) var(--space-4)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-md)",
+                    color: "var(--color-text)",
+                  }}
+                >
+                  <span>
+                    <strong>{fixture.name}</strong>
+                    {fixture.venue && (
+                      <span style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
+                        {" "}
+                        — {fixture.venue.name}
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-data)",
+                      fontSize: "var(--font-size-xs)",
+                      color: "var(--color-text-faint)",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {fixture.status}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section
