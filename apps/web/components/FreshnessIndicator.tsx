@@ -9,13 +9,7 @@ import { freshnessTokens, type DataFreshnessState } from "@sports/design";
  * as live. `updatedAt` re-renders on an interval so "UPDATED Ns AGO" keeps
  * counting without a new event arriving.
  */
-export function FreshnessIndicator({
-  state,
-  updatedAt,
-}: {
-  state: DataFreshnessState;
-  updatedAt: string;
-}) {
+export function FreshnessIndicator({ state, updatedAt }: { state: DataFreshnessState; updatedAt: string }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -25,8 +19,7 @@ export function FreshnessIndicator({
 
   const tokens = freshnessTokens[state];
   const secondsAgo = Math.max(0, Math.round((now - new Date(updatedAt).getTime()) / 1000));
-  const label =
-    state === "live" && secondsAgo > 0 ? `LIVE · ${secondsAgo}s AGO` : tokens.label;
+  const label = state === "live" && secondsAgo > 0 ? `LIVE · ${secondsAgo}s AGO` : tokens.label;
 
   return (
     <span

@@ -9,6 +9,8 @@ import { bootstrapF1Calendar } from "./bootstrapCalendar";
 import { getActiveF1Sessions } from "./activeSessions";
 import { mergeDriverTimingPatches, toPitStopRow, toRaceControlMessageRow } from "./currentState";
 import { upsertDriverTiming, upsertPitStop, upsertRaceControlMessage } from "./persist";
+import { scheduleLoop, type ScheduledLoop } from "../scheduleLoop";
+import { loadProviderCursors, saveProviderCursor } from "../providerCursor";
 
 /**
  * `getDriverTimingPatches` is a bonus method on `OpenF1Adapter`, deliberately
@@ -39,7 +41,7 @@ function hasCurrentStatePatches(provider: SportsProvider): provider is CurrentSt
  * in the same tick or any future tick — see docs/CONTEXT.md §9
  * "Error handling".
  */
-export async function runF1Job(provider: SportsProvider): Promise<void> {
+export async function runF1Job(provider: SportsProvider): Promise<ScheduledLoop> {
   logger.info({ seasons: config.f1BootstrapSeasons }, "F1 job starting — bootstrapping calendar");
   try {
     await bootstrapF1Calendar(provider, { seasonLabels: config.f1BootstrapSeasons });
@@ -55,9 +57,9 @@ export async function runF1Job(provider: SportsProvider): Promise<void> {
   // for it, used as pollLiveEvents' `since` cursor so each tick only
   // requests what's new (verified working against the real API at
   // Checkpoint 3 — the "date>" query convention).
-  const cursors = new Map<string, string>();
+  const cursors = await loadProviderCursors(provider.id);
 
-  setInterval(async () => {
+  return scheduleLoop(async () => {
     try {
       const sessions = await prisma.session.findMany({
         where: { fixture: { sport: { slug: provider.sportId } } },
@@ -65,7 +67,10 @@ export async function runF1Job(provider: SportsProvider): Promise<void> {
       });
       await pollActiveSessions(provider, getActiveF1Sessions(sessions), cursors);
     } catch (error) {
-      logger.error({ error: error instanceof Error ? error.message : String(error) }, "failed to load sessions for active-session selection");
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        "failed to load sessions for active-session selection",
+      );
     }
   }, config.f1PollIntervalMs);
 }
@@ -91,7 +96,11 @@ export async function pollActiveSessions(
     } catch (error) {
       // One session's failure must not stop the others in this same tick.
       logger.error(
-        { sessionId: target.sessionId, reason: target.reason, error: error instanceof Error ? error.message : String(error) },
+        {
+          sessionId: target.sessionId,
+          reason: target.reason,
+          error: error instanceof Error ? error.message : String(error),
+        },
         "F1 session poll failed",
       );
     }
@@ -116,15 +125,16 @@ async function pollOneSession(
       latestTimestamp = event.timestamp;
     }
   }
-  if (latestTimestamp) cursors.set(sessionId, latestTimestamp);
-
   // getDriverTimingPatches has no dedicated LiveEvent type to key off (see
   // docs/CONTEXT.md §7.3/§9) — pulled and merged separately, same `since`.
-  const patches = hasCurrentStatePatches(provider)
-    ? await provider.getDriverTimingPatches(sessionId, since)
-    : [];
+  const patches = hasCurrentStatePatches(provider) ? await provider.getDriverTimingPatches(sessionId, since) : [];
   for (const patch of mergeDriverTimingPatches(patches)) {
     await upsertDriverTiming(patch);
+  }
+
+  if (latestTimestamp) {
+    await saveProviderCursor(provider.id, sessionId, latestTimestamp);
+    cursors.set(sessionId, latestTimestamp);
   }
 
   logger.info(

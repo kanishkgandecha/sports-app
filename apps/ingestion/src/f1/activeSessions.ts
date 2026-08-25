@@ -44,10 +44,7 @@ export function classifySessionState(
  * `classifySessionState`) but never actively polled, so a full historical
  * calendar bootstrap doesn't turn into continuous polling of ~100 sessions.
  */
-export function getActiveF1Sessions(
-  sessions: SessionForScheduling[],
-  now: Date = new Date(),
-): ActiveSessionTarget[] {
+export function getActiveF1Sessions(sessions: SessionForScheduling[], now: Date = new Date()): ActiveSessionTarget[] {
   return sessions
     .filter((session) => classifySessionState(session, now) === "live")
     .map((session) => {

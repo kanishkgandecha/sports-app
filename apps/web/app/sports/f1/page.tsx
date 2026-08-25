@@ -14,7 +14,7 @@ import { formatDate } from "../../../lib/format";
 import styles from "./f1Landing.module.css";
 import { Countdown } from "../../../components/Countdown";
 
-export const metadata: Metadata = { title: "Formula 1 — Sports Platform" };
+export const metadata: Metadata = { title: "F1 Race Center" };
 
 const SESSION_LABEL: Record<string, string> = {
   FP1: "FP1",
@@ -28,8 +28,12 @@ const SESSION_LABEL: Record<string, string> = {
 
 async function getFixtures(): Promise<F1Fixture[]> {
   try {
-    const { fixtures } = await apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures");
-    return fixtures;
+    const results = await Promise.all([
+      apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures?status=live&limit=5&order=desc"),
+      apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures?status=scheduled&limit=8&order=asc"),
+      apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures?status=completed&limit=6&order=desc"),
+    ]);
+    return results.flatMap((result) => result.fixtures);
   } catch {
     return [];
   }
@@ -39,7 +43,9 @@ async function getFixtures(): Promise<F1Fixture[]> {
 function pickFeaturedSession(sessions: F1Session[]): F1Session | undefined {
   const live = sessions.find((s) => s.lifecycle === "live");
   if (live) return live;
-  const upcoming = [...sessions].filter((s) => s.lifecycle === "upcoming").sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const upcoming = [...sessions]
+    .filter((s) => s.lifecycle === "upcoming")
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
   if (upcoming[0]) return upcoming[0];
   return [...sessions].reverse().find((s) => s.lifecycle === "completed");
 }
@@ -58,8 +64,12 @@ export default async function F1LandingPage() {
   const fixtures = await getFixtures();
 
   const live = fixtures.filter((f) => f.status === "live");
-  const upcoming = [...fixtures.filter((f) => f.status === "scheduled")].sort((a, b) => a.startTime.localeCompare(b.startTime));
-  const completed = [...fixtures.filter((f) => f.status === "completed")].sort((a, b) => b.startTime.localeCompare(a.startTime));
+  const upcoming = [...fixtures.filter((f) => f.status === "scheduled")].sort((a, b) =>
+    a.startTime.localeCompare(b.startTime),
+  );
+  const completed = [...fixtures.filter((f) => f.status === "completed")].sort((a, b) =>
+    b.startTime.localeCompare(a.startTime),
+  );
 
   const featuredFixture = live[0] ?? upcoming[0] ?? completed[0];
   const featuredDetail = featuredFixture ? await getF1Fixture(featuredFixture.id).catch(() => null) : null;
@@ -97,9 +107,13 @@ export default async function F1LandingPage() {
                     {featuredFixture.venue.name}, {featuredFixture.venue.country}
                   </span>
                 )}
-                <Link href={`/events/${featuredFixture.id}`} className={styles.heroCta}>
-                  Open Event Center →
-                </Link>
+                {featuredFixture.detailAvailable ? (
+                  <Link href={`/events/${featuredFixture.id}`} className={styles.heroCta}>
+                    Open Event Center →
+                  </Link>
+                ) : (
+                  <span className={styles.heroCta}>Detailed data pending</span>
+                )}
               </div>
             </>
           ) : (
@@ -145,7 +159,11 @@ export default async function F1LandingPage() {
               {driverStandings.map((s) => (
                 <div className={styles.standingsRow} key={s.driver.id}>
                   <span className={styles.standingsPos}>{s.position}</span>
-                  <span className={styles.standingsSwatch} style={{ background: s.team?.colorHex ?? "var(--color-border)" }} aria-hidden="true" />
+                  <span
+                    className={styles.standingsSwatch}
+                    style={{ background: s.team?.colorHex ?? "var(--color-border)" }}
+                    aria-hidden="true"
+                  />
                   <span className={styles.standingsName}>{s.driver.shortName ?? s.driver.name}</span>
                   <span className={styles.standingsPoints}>{s.points}</span>
                 </div>
@@ -156,7 +174,11 @@ export default async function F1LandingPage() {
               {constructorStandings.map((s) => (
                 <div className={styles.standingsRow} key={s.team.id}>
                   <span className={styles.standingsPos}>{s.position}</span>
-                  <span className={styles.standingsSwatch} style={{ background: s.team.colorHex ?? "var(--color-border)" }} aria-hidden="true" />
+                  <span
+                    className={styles.standingsSwatch}
+                    style={{ background: s.team.colorHex ?? "var(--color-border)" }}
+                    aria-hidden="true"
+                  />
                   <span className={styles.standingsName}>{s.team.name}</span>
                   <span className={styles.standingsPoints}>{s.points}</span>
                 </div>
@@ -169,9 +191,14 @@ export default async function F1LandingPage() {
       <section className={styles.section} aria-label="Recent results">
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Recent results</h2>
+          <Link href="/archive" className={styles.sectionLink}>
+            Browse archive →
+          </Link>
         </div>
         {completed.length === 0 ? (
-          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>No completed sessions yet.</p>
+          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
+            No completed sessions yet.
+          </p>
         ) : (
           <FixtureList fixtures={completed.slice(0, 5)} />
         )}
@@ -192,8 +219,8 @@ export default async function F1LandingPage() {
         <div className={styles.learnCardText}>
           <span className={styles.learnCardTitle}>New to F1?</span>
           <p className={styles.learnCardBody}>
-            Sessions, points, flags, Safety Cars — plain-language explanations, whenever you want
-            them, never in your way.
+            Sessions, points, flags, Safety Cars — plain-language explanations, whenever you want them, never in your
+            way.
           </p>
         </div>
         <Link href="/learn" className={styles.heroCta}>
@@ -209,15 +236,33 @@ function FixtureList({ fixtures }: { fixtures: F1Fixture[] }) {
     <ul className={styles.fixtureList}>
       {fixtures.map((fixture) => (
         <li key={fixture.id}>
-          <Link href={`/events/${fixture.id}`} className={styles.fixtureRow}>
-            <span className={styles.fixtureName}>
-              <span className={styles.fixtureNameText}>{fixture.name}</span>
-              {fixture.venue && <span className={styles.fixtureVenue}>{fixture.venue.name}, {fixture.venue.country}</span>}
+          {fixture.detailAvailable ? (
+            <Link href={`/events/${fixture.id}`} className={styles.fixtureRow}>
+              <FixtureRowContent fixture={fixture} />
+            </Link>
+          ) : (
+            <span className={styles.fixtureRow} aria-disabled="true">
+              <FixtureRowContent fixture={fixture} />
             </span>
-            <span className={styles.fixtureDate}>{formatDate(fixture.startTime)}</span>
-          </Link>
+          )}
         </li>
       ))}
     </ul>
+  );
+}
+
+function FixtureRowContent({ fixture }: { fixture: F1Fixture }) {
+  return (
+    <>
+      <span className={styles.fixtureName}>
+        <span className={styles.fixtureNameText}>{fixture.name}</span>
+        {fixture.venue && (
+          <span className={styles.fixtureVenue}>
+            {fixture.venue.name}, {fixture.venue.country}
+          </span>
+        )}
+      </span>
+      <span className={styles.fixtureDate}>{formatDate(fixture.startTime)}</span>
+    </>
   );
 }

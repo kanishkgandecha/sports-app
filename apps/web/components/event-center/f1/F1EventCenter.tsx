@@ -48,8 +48,14 @@ const REFETCH_DEBOUNCE_MS = 400;
  * for how the timing tower dominates the layout).
  */
 export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessions: F1Session[] }) {
-  const [activeSessionId, setActiveSessionId] = useState(() => pickInitialSession(sessions)?.id ?? sessions[0]?.id);
-  const activeSession = sessions.find((s) => s.id === activeSessionId);
+  const availableSessions = useMemo(
+    () => sessions.filter((session) => session.detailAvailable || session.lifecycle === "live"),
+    [sessions],
+  );
+  const [activeSessionId, setActiveSessionId] = useState(
+    () => pickInitialSession(availableSessions)?.id ?? availableSessions[0]?.id,
+  );
+  const activeSession = availableSessions.find((s) => s.id === activeSessionId);
 
   const [timing, setTiming] = useState<ListState<F1TimingRow>>(IDLE_LIST);
   const [raceControl, setRaceControl] = useState<ListState<F1RaceControlMessage>>(IDLE_LIST);
@@ -107,9 +113,12 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
     if (refetchTimer.current) clearTimeout(refetchTimer.current);
     refetchTimer.current = setTimeout(() => void loadAll(activeSessionId), REFETCH_DEBOUNCE_MS);
   }
-  useEffect(() => () => {
-    if (refetchTimer.current) clearTimeout(refetchTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (refetchTimer.current) clearTimeout(refetchTimer.current);
+    },
+    [],
+  );
 
   const { freshness } = useLiveSession(activeSessionId ?? null, {
     isLive: activeSession?.lifecycle === "live",
@@ -127,7 +136,11 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
         <div className={styles.headerTop}>
           <div>
             <h1 className={styles.fixtureName}>{fixture.name}</h1>
-            {fixture.venue && <p className={styles.venue}>{fixture.venue.name}, {fixture.venue.country}</p>}
+            {fixture.venue && (
+              <p className={styles.venue}>
+                {fixture.venue.name}, {fixture.venue.country}
+              </p>
+            )}
           </div>
           <EducationTrigger label="New to F1?" onOpen={() => setEducationSlug("what-is-f1")} />
         </div>
@@ -135,7 +148,11 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
           <span className={styles.sessionLabel}>{activeSession.type.replace(/_/g, " ")}</span>
           <FreshnessIndicator state={freshness.state} updatedAt={freshness.updatedAt ?? new Date().toISOString()} />
         </div>
-        <SessionSelector sessions={sessions} activeSessionId={activeSession.id} onSelect={setActiveSessionId} />
+        <SessionSelector
+          sessions={availableSessions}
+          activeSessionId={activeSession.id}
+          onSelect={setActiveSessionId}
+        />
       </header>
 
       <div className={styles.mainGrid}>

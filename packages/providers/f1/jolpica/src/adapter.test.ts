@@ -15,8 +15,7 @@ import type { JolpicaConstructorStanding, JolpicaDriverStanding, JolpicaRace, Jo
  */
 class FixtureJolpicaClient implements JolpicaHttpClient {
   async getDriverStandings(): Promise<JolpicaDriverStanding[]> {
-    return driverStandingsFixture.MRData.StandingsTable.StandingsLists[0]
-      .DriverStandings as JolpicaDriverStanding[];
+    return driverStandingsFixture.MRData.StandingsTable.StandingsLists[0].DriverStandings as JolpicaDriverStanding[];
   }
   async getConstructorStandings(): Promise<JolpicaConstructorStanding[]> {
     return constructorStandingsFixture.MRData.StandingsTable.StandingsLists[0]

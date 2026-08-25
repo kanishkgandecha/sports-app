@@ -1,17 +1,4 @@
-/*
- * Cricket Checkpoint 2 — extracted from f1EventCenter.module.css. StateView
- * and GlossaryDrawer/EducationTrigger were already sport-agnostic in logic
- * (ARCHITECTURE.md §2 places them above the live-data layer, below any
- * sport skin) but had never had a real second sport to prove it — both
- * imported f1EventCenter.module.css directly, which was fine when F1 was
- * the only skin that existed but became a real cross-sport layering
- * violation the moment Cricket needed the exact same drawer. This module
- * holds only those genuinely shared classes, values unchanged from F1's
- * module, so F1's rendering is byte-identical after the move. Sport skins
- * (f1EventCenter.module.css, cricketEventCenter.module.css) keep their own
- * sport-specific classes and must never be reached into from here or from
- * each other.
- */
+/* Shared Event Center states and education drawer. */
 
 /* ---- state views (loading/empty/error) ----------------------------------- */
 
@@ -43,7 +30,9 @@
   border-radius: var(--radius-full);
   padding: var(--space-1) var(--space-3);
   cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
 }
 
 .educationTrigger:hover {

@@ -1,6 +1,5 @@
-// Core schema — see ARCHITECTURE.md §5 for the terminology and reasoning.
-// Sport-specific extension tables (F1 first) are added as their own models
-// below, one phase at a time — never retrofitted into the core tables.
+// Formula 1 data model. The generic event/session names remain useful F1
+// vocabulary while sport-specific timing data stays in extension tables.
 
 generator client {
   provider = "prisma-client-js"
@@ -62,12 +61,9 @@ model Season {
 }
 
 model Venue {
-  id      String  @id @default(cuid())
-  name    String
-  /// Nullable since Cricket Checkpoint 1 — see @sports/domain's Venue doc
-  /// comment. CricketData.org gives no separate country field; F1 rows
-  /// are unaffected (OpenF1Adapter always populates a real value).
-  country String?
+  id       String @id @default(cuid())
+  name     String
+  country  String
   timezone String
 
   fixtures Fixture[]
@@ -108,7 +104,7 @@ model Player {
 }
 
 model Fixture {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   sportId       String
   competitionId String
   seasonId      String
@@ -118,15 +114,61 @@ model Fixture {
   startTime     DateTime
   venueId       String?
 
-  sport       Sport       @relation(fields: [sportId], references: [id])
-  competition Competition @relation(fields: [competitionId], references: [id])
-  season      Season      @relation(fields: [seasonId], references: [id])
-  venue       Venue?      @relation(fields: [venueId], references: [id])
+  sport       Sport               @relation(fields: [sportId], references: [id])
+  competition Competition         @relation(fields: [competitionId], references: [id])
+  season      Season              @relation(fields: [seasonId], references: [id])
+  venue       Venue?              @relation(fields: [venueId], references: [id])
   sessions    Session[]
+  dataProfile FixtureDataProfile?
 
   @@unique([sportId, slug])
   @@index([competitionId, status])
   @@index([startTime])
+}
+
+/// Provider provenance and honest data-depth metadata for one imported
+/// fixture. Kept separate from the core Fixture contract: live/current
+/// ingestion predates the historical archive, and source/coverage are
+/// ingestion concerns rather than universal sports-domain fields.
+model FixtureDataProfile {
+  id             String   @id @default(cuid())
+  fixtureId      String   @unique
+  source         String
+  externalId     String
+  coverage       String // "summary" | "event-data"
+  attribution    String?
+  sourceRevision String?
+  datePrecision  String? // "instant" | "day"
+  importedAt     DateTime @default(now())
+
+  fixture Fixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+
+  @@unique([source, externalId])
+  @@index([source, coverage])
+}
+
+/// Resume/audit record for an explicit, bounded historical import. This is
+/// operational metadata only; the archive API reads normalized Fixture data,
+/// never raw import payloads.
+model HistoricalImport {
+  id             String    @id @default(cuid())
+  sportSlug      String
+  source         String
+  scopeKey       String
+  status         String // "running" | "completed" | "failed"
+  sourceRevision String?
+  checksum       String?
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+  importedCount  Int       @default(0)
+  skippedCount   Int       @default(0)
+  failedCount    Int       @default(0)
+  error          String?
+  metadata       Json      @default("{}")
+
+  @@unique([source, scopeKey])
+  @@index([sportSlug, startedAt])
+  @@index([status])
 }
 
 model Session {
@@ -147,6 +189,9 @@ model Session {
 /// Append-only. Never mutated after insert — corrections arrive as new rows.
 model LiveEvent {
   id        String   @id @default(cuid())
+  /// Database-assigned global order. Provider timestamps can collide or
+  /// arrive late; this is the durable SSE resume cursor.
+  sequence  BigInt   @unique @default(autoincrement())
   sportId   String
   sessionId String
   eventType String
@@ -158,6 +203,7 @@ model LiveEvent {
   session Session @relation(fields: [sessionId], references: [id])
 
   @@index([sessionId, timestamp])
+  @@index([sessionId, sequence])
   @@index([eventType])
 }
 
@@ -181,13 +227,26 @@ model Standing {
 /// Raw provider payloads, retained for debugging/audit only — never the
 /// primary application model (ARCHITECTURE.md §4, master brief §19).
 model ProviderRawResponse {
-  id         String   @id @default(cuid())
-  providerId String
-  method     String
+  id          String   @id @default(cuid())
+  providerId  String
+  method      String
   requestedAt DateTime
-  body       Json
+  body        Json
 
   @@index([providerId, requestedAt])
+}
+
+/// Durable upstream resume position. A worker restart must not turn every
+/// provider poll into an unbounded historical refetch.
+model ProviderCursor {
+  id         String   @id @default(cuid())
+  providerId String
+  sessionId  String
+  cursor     String
+  updatedAt  DateTime @updatedAt
+
+  @@unique([providerId, sessionId])
+  @@index([providerId, updatedAt])
 }
 
 // Education content deliberately has no table here. EducationConcept lives
@@ -223,12 +282,12 @@ model DriverTiming {
 }
 
 model PitStop {
-  id          String   @id @default(cuid())
-  sessionId   String
-  driverId    String
-  lap         Int
-  durationMs  Int
-  timestamp   DateTime
+  id         String   @id @default(cuid())
+  sessionId  String
+  driverId   String
+  lap        Int
+  durationMs Int
+  timestamp  DateTime
 
   @@index([sessionId, driverId])
 }
@@ -241,90 +300,4 @@ model RaceControlMessage {
   message   String
 
   @@index([sessionId, timestamp])
-}
-
-// ---------------------------------------------------------------------------
-// Cricket extension (Phase 2, Checkpoint 1) — see ARCHITECTURE.md §5 and
-// docs/CONTEXT.md's Cricket domain proposal (Checkpoint 7 §8) and this
-// checkpoint's implementation notes. Same no-FK-constraint pattern as the F1
-// extension above (DriverTiming/PitStop/RaceControlMessage): plain indexed
-// id columns, not `@relation` fields — a Phase 0/Checkpoint 2 schema
-// characteristic kept consistent here rather than introduced ad hoc.
-// ---------------------------------------------------------------------------
-
-/// One row per Fixture (= match). Cricket-only facts a Fixture has no slot
-/// for — see the doc comment on @sports/domain's CricketFixtureDetail for
-/// why exactly these fields and no more.
-model CricketFixtureDetail {
-  id              String  @id @default(cuid())
-  fixtureId       String  @unique
-  /// Nullable — verified real: CricketData.org's own `matchType` is
-  /// genuinely absent on some real matches. See @sports/domain's
-  /// CricketFixtureDetail doc comment for the fallback heuristic.
-  format          String? // "TEST" | "ODI" | "T20" | null
-  tossWonByTeamId String?
-  tossDecision    String? // "BAT" | "BOWL"
-  result          String?
-
-  @@index([fixtureId])
-}
-
-/// One row per Session (= innings) — current-state snapshot, the cricket
-/// equivalent of DriverTiming. Upserted in place; never replayed from
-/// LiveEvent to answer "what's the score right now."
-model CricketInningsState {
-  id               String  @id @default(cuid())
-  sessionId        String  @unique
-  battingTeamId    String
-  bowlingTeamId    String
-  runs             Int
-  wickets          Int
-  /// Decimal overs, e.g. 14.3 — matches the provider's own `o` field format.
-  overs            Float
-  strikerId        String?
-  nonStrikerId     String?
-  currentBowlerId  String?
-  /// Derived (first innings total + 1), not read from the provider — see
-  /// @sports/domain's CricketInningsState doc comment.
-  target           Int?
-  requiredRunRate  Float?
-
-  @@index([sessionId])
-}
-
-/// Cricket Checkpoint 2 — one row per batsman per innings. See
-/// @sports/domain's CricketBattingFigure doc comment for why this exists
-/// and why it's scoped exactly this way (no extras/totals — verified
-/// empty on every real scorecard captured).
-model CricketBattingFigure {
-  id            String @id @default(cuid())
-  sessionId     String
-  playerId      String
-  battingOrder  Int
-  runs          Int
-  balls         Int
-  fours         Int
-  sixes         Int
-  strikeRate    Float
-  dismissalText String
-
-  @@unique([sessionId, playerId])
-  @@index([sessionId, battingOrder])
-}
-
-/// One row per bowler per innings (aggregated across all their overs —
-/// matches the real provider shape, one entry per bowler, not per over).
-model CricketBowlingFigure {
-  id            String @id @default(cuid())
-  sessionId     String
-  playerId      String
-  bowlingOrder  Int
-  overs         Float
-  maidens       Int
-  runsConceded  Int
-  wickets       Int
-  economy       Float
-
-  @@unique([sessionId, playerId])
-  @@index([sessionId, bowlingOrder])
 }

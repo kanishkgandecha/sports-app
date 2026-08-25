@@ -8,13 +8,16 @@
     "build": "tsup src/index.ts --format cjs --clean",
     "start": "node --env-file=../../.env dist/index.cjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "history:f1": "tsx --env-file=../../.env src/history/f1/cli.ts",
+    "history:f1:rolling": "tsx --env-file=../../.env src/history/f1/cli.ts --years=3 --limit=30",
+    "history:f1:details": "tsx --env-file=../../.env src/history/f1/detailCli.ts",
+    "history:f1:details:rolling": "tsx --env-file=../../.env src/history/f1/detailCli.ts --years=3 --limit=30"
   },
   "dependencies": {
     "@sports/db": "workspace:*",
     "@sports/domain": "workspace:*",
     "@sports/providers-core": "workspace:*",
-    "@sports/providers-cricket-cricketdata": "workspace:*",
     "@sports/providers-f1-jolpica": "workspace:*",
     "@sports/providers-f1-openf1": "workspace:*",
     "pino": "^10.3.1"

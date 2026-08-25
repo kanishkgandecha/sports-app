@@ -18,14 +18,30 @@ class FaultyProvider implements SportsProvider {
   readonly id = "test-faulty";
   readonly sportId = SPORT_SLUG;
 
-  async getCompetitions() { return []; }
-  async getSeasons() { return []; }
-  async getFixtures() { return []; }
-  async getSessions() { return []; }
-  async getTeams() { return []; }
-  async getPlayers() { return []; }
-  async getVenues() { return []; }
-  async getStandings() { return []; }
+  async getCompetitions() {
+    return [];
+  }
+  async getSeasons() {
+    return [];
+  }
+  async getFixtures() {
+    return [];
+  }
+  async getSessions() {
+    return [];
+  }
+  async getTeams() {
+    return [];
+  }
+  async getPlayers() {
+    return [];
+  }
+  async getVenues() {
+    return [];
+  }
+  async getStandings() {
+    return [];
+  }
 
   async pollLiveEvents(input: { sessionId: string }): Promise<LiveEvent[]> {
     if (input.sessionId === "bad-timeout") {
@@ -54,12 +70,14 @@ class FaultyProvider implements SportsProvider {
 }
 
 async function cleanup() {
+  await prisma.providerCursor.deleteMany({ where: { providerId: "test-faulty" } });
   const sport = await prisma.sport.findUnique({ where: { slug: SPORT_SLUG } });
   if (sport) await prisma.liveEvent.deleteMany({ where: { sportId: sport.id } });
   await prisma.session.deleteMany({ where: { id: "good" } });
   await prisma.fixture.deleteMany({ where: { id: "job-test-fixture" } });
   await prisma.season.deleteMany({ where: { id: "job-test-season" } });
   await prisma.competition.deleteMany({ where: { id: "job-test-competition" } });
+  await prisma.sport.deleteMany({ where: { slug: SPORT_SLUG } });
 }
 
 describe("pollActiveSessions — error isolation (integration, real Postgres)", () => {
@@ -68,16 +86,32 @@ describe("pollActiveSessions — error isolation (integration, real Postgres)", 
     // FK (unlike DriverTiming/PitStop/RaceControlMessage). "bad-timeout"/
     // "bad-malformed" never reach publishLiveEvent (pollLiveEvents throws
     // first), so they need no DB row at all.
-    const sport = await prisma.sport.upsert({ where: { slug: SPORT_SLUG }, update: {}, create: { slug: SPORT_SLUG, name: "Test Job Sport", status: "beta" } });
+    const sport = await prisma.sport.upsert({
+      where: { slug: SPORT_SLUG },
+      update: {},
+      create: { slug: SPORT_SLUG, name: "Test Job Sport", status: "beta" },
+    });
     const competition = await prisma.competition.upsert({
       where: { id: "job-test-competition" },
       update: {},
-      create: { id: "job-test-competition", sportId: sport.id, slug: "job-test-competition", name: "Test", type: "championship" },
+      create: {
+        id: "job-test-competition",
+        sportId: sport.id,
+        slug: "job-test-competition",
+        name: "Test",
+        type: "championship",
+      },
     });
     const season = await prisma.season.upsert({
       where: { id: "job-test-season" },
       update: {},
-      create: { id: "job-test-season", competitionId: competition.id, label: "2099", startDate: new Date("2099-01-01"), endDate: new Date("2099-12-31") },
+      create: {
+        id: "job-test-season",
+        competitionId: competition.id,
+        label: "2099",
+        startDate: new Date("2099-01-01"),
+        endDate: new Date("2099-12-31"),
+      },
     });
     const fixture = await prisma.fixture.upsert({
       where: { id: "job-test-fixture" },

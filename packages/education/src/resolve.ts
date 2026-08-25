@@ -27,23 +27,29 @@ export class EducationIndex {
 
   /** Concepts this one links to, resolved from slugs to full concepts. */
   related(slug: string): EducationConcept[] {
-    return this.get(slug)?.relatedConceptSlugs.map((s) => this.bySlug.get(s)).filter(
-      (c): c is EducationConcept => Boolean(c),
-    ) ?? [];
+    return (
+      this.get(slug)
+        ?.relatedConceptSlugs.map((s) => this.bySlug.get(s))
+        .filter((c): c is EducationConcept => Boolean(c)) ?? []
+    );
   }
 
   /** "Why did this happen?" */
   precededBy(slug: string): EducationConcept[] {
-    return this.get(slug)?.precededBy.map((s) => this.bySlug.get(s)).filter(
-      (c): c is EducationConcept => Boolean(c),
-    ) ?? [];
+    return (
+      this.get(slug)
+        ?.precededBy.map((s) => this.bySlug.get(s))
+        .filter((c): c is EducationConcept => Boolean(c)) ?? []
+    );
   }
 
   /** "What happens next?" */
   followedBy(slug: string): EducationConcept[] {
-    return this.get(slug)?.followedBy.map((s) => this.bySlug.get(s)).filter(
-      (c): c is EducationConcept => Boolean(c),
-    ) ?? [];
+    return (
+      this.get(slug)
+        ?.followedBy.map((s) => this.bySlug.get(s))
+        .filter((c): c is EducationConcept => Boolean(c)) ?? []
+    );
   }
 
   all(): EducationConcept[] {

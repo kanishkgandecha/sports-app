@@ -96,6 +96,7 @@ async function cleanupAll() {
   await cleanupStandings();
   await prisma.season.deleteMany({ where: { id: season.id } });
   await prisma.competition.deleteMany({ where: { id: competition.id } });
+  await prisma.sport.deleteMany({ where: { slug: SPORT_ID } });
 }
 
 describe("syncF1Standings (integration, real Postgres)", () => {
@@ -107,10 +108,22 @@ describe("syncF1Standings (integration, real Postgres)", () => {
       create: { slug: SPORT_ID, name: "Test Standings Sport", status: "beta" },
     });
     await prisma.competition.create({
-      data: { id: competition.id, sportId: sportRow.id, slug: competition.slug, name: competition.name, type: competition.type },
+      data: {
+        id: competition.id,
+        sportId: sportRow.id,
+        slug: competition.slug,
+        name: competition.name,
+        type: competition.type,
+      },
     });
     await prisma.season.create({
-      data: { id: season.id, competitionId: competition.id, label: season.label, startDate: new Date(season.startDate), endDate: new Date(season.endDate) },
+      data: {
+        id: season.id,
+        competitionId: competition.id,
+        label: season.label,
+        startDate: new Date(season.startDate),
+        endDate: new Date(season.endDate),
+      },
     });
   });
   afterAll(cleanupAll);
@@ -143,7 +156,9 @@ describe("syncF1Standings (integration, real Postgres)", () => {
     const provider = new TestStandingsProvider();
     await syncF1Standings(provider, { seasonLabels: ["2099"] });
 
-    provider.standingsToReturn = standings.map((s) => (s.entityId === "f1-test-standings-driver-1" ? { ...s, points: 125, position: 2 } : s));
+    provider.standingsToReturn = standings.map((s) =>
+      s.entityId === "f1-test-standings-driver-1" ? { ...s, points: 125, position: 2 } : s,
+    );
     await syncF1Standings(provider, { seasonLabels: ["2099"] });
 
     const rows = await prisma.standing.findMany({ where: { seasonId: season.id } });

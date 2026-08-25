@@ -1,7 +1,6 @@
 import type { SportsProvider } from "@sports/providers-core";
 import { OpenF1Adapter } from "@sports/providers-f1-openf1";
 import { JolpicaAdapter } from "@sports/providers-f1-jolpica";
-import { CricketDataAdapter } from "@sports/providers-cricket-cricketdata";
 import { config } from "../config";
 import { logger } from "../logger";
 
@@ -23,14 +22,15 @@ export function resolveF1Provider(): SportsProvider | null {
         if (!log.ok) {
           logger.warn({ provider: log.providerId, method: log.method, error: log.error }, "provider request failed");
         } else {
-          logger.debug({ provider: log.providerId, method: log.method, durationMs: log.durationMs }, "provider request");
+          logger.debug(
+            { provider: log.providerId, method: log.method, durationMs: log.durationMs },
+            "provider request",
+          );
         }
       },
     });
   }
-  throw new Error(
-    `Unknown F1_PROVIDER "${config.f1Provider}" — expected "openf1" or "disabled"`,
-  );
+  throw new Error(`Unknown F1_PROVIDER "${config.f1Provider}" — expected "openf1" or "disabled"`);
 }
 
 /**
@@ -53,48 +53,13 @@ export function resolveF1StandingsProvider(): SportsProvider | null {
         if (!log.ok) {
           logger.warn({ provider: log.providerId, method: log.method, error: log.error }, "provider request failed");
         } else {
-          logger.debug({ provider: log.providerId, method: log.method, durationMs: log.durationMs }, "provider request");
+          logger.debug(
+            { provider: log.providerId, method: log.method, durationMs: log.durationMs },
+            "provider request",
+          );
         }
       },
     });
   }
-  throw new Error(
-    `Unknown F1_STANDINGS_PROVIDER "${config.f1StandingsProvider}" — expected "jolpica" or "disabled"`,
-  );
-}
-
-/**
- * Cricket Checkpoint 1. Defaults to disabled — see config.ts's doc comment
- * on `cricketProvider` for why (a real, confirmed 100 req/day rate limit
- * this checkpoint won't spend without explicit opt-in). Also refuses to
- * start without a real, non-empty `CRICKETDATA_API_KEY` even if
- * `CRICKET_PROVIDER=cricketdata` is set — a missing key would otherwise
- * only surface as every single request failing at runtime.
- */
-export function resolveCricketProvider(): SportsProvider | null {
-  if (config.cricketProvider === "disabled") {
-    logger.info({ cricketProvider: config.cricketProvider }, "Cricket job disabled via configuration");
-    return null;
-  }
-  if (config.cricketProvider === "cricketdata") {
-    if (!config.cricketDataApiKey) {
-      logger.warn(
-        "CRICKET_PROVIDER=cricketdata but CRICKETDATA_API_KEY is not set — Cricket job disabled. See .env.example.",
-      );
-      return null;
-    }
-    return new CricketDataAdapter({
-      apiKey: config.cricketDataApiKey,
-      onRequest: (log) => {
-        if (!log.ok) {
-          logger.warn({ provider: log.providerId, method: log.method, error: log.error }, "provider request failed");
-        } else {
-          logger.debug({ provider: log.providerId, method: log.method, durationMs: log.durationMs }, "provider request");
-        }
-      },
-    });
-  }
-  throw new Error(
-    `Unknown CRICKET_PROVIDER "${config.cricketProvider}" — expected "cricketdata" or "disabled"`,
-  );
+  throw new Error(`Unknown F1_STANDINGS_PROVIDER "${config.f1StandingsProvider}" — expected "jolpica" or "disabled"`);
 }

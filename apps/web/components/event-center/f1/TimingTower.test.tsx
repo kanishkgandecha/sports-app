@@ -7,7 +7,13 @@ import type { F1TimingRow } from "../../../lib/f1Api";
 function row(overrides: Partial<F1TimingRow>): F1TimingRow {
   return {
     position: 1,
-    driver: { id: "d1", name: "Test Driver", shortName: "TST", avatarUrl: null, team: { id: "t1", name: "Test Team", colorHex: "#ff0000" } },
+    driver: {
+      id: "d1",
+      name: "Test Driver",
+      shortName: "TST",
+      avatarUrl: null,
+      team: { id: "t1", name: "Test Team", colorHex: "#ff0000" },
+    },
     gapToLeader: null,
     intervalToAhead: null,
     lastLapTime: null,
@@ -40,8 +46,29 @@ describe("TimingTower", () => {
 
   it("renders real driver/team/tyre data in position order, using tabular formatting", () => {
     const rows = [
-      row({ position: 1, driver: { id: "d1", name: "Leader", shortName: "LDR", avatarUrl: null, team: { id: "t1", name: "Team One", colorHex: "#ff0000" } }, lastLapTime: 88.123, tyreCompound: "SOFT" }),
-      row({ position: 2, driver: { id: "d2", name: "Second", shortName: "SEC", avatarUrl: null, team: { id: "t2", name: "Team Two", colorHex: "#00ff00" } }, gapToLeader: "+2.500" }),
+      row({
+        position: 1,
+        driver: {
+          id: "d1",
+          name: "Leader",
+          shortName: "LDR",
+          avatarUrl: null,
+          team: { id: "t1", name: "Team One", colorHex: "#ff0000" },
+        },
+        lastLapTime: 88.123,
+        tyreCompound: "SOFT",
+      }),
+      row({
+        position: 2,
+        driver: {
+          id: "d2",
+          name: "Second",
+          shortName: "SEC",
+          avatarUrl: null,
+          team: { id: "t2", name: "Team Two", colorHex: "#00ff00" },
+        },
+        gapToLeader: "+2.500",
+      }),
     ];
     render(<TimingTower rows={rows} loading={false} error={false} />);
 
@@ -68,7 +95,9 @@ describe("TimingTower", () => {
 
   it("flashes a row via the shared LiveValue mechanism (components/LiveValue.tsx) when its position changes", () => {
     const d1 = { id: "d1", name: "Leader", shortName: "LDR", avatarUrl: null, team: null };
-    const { rerender } = render(<TimingTower rows={[row({ position: 1, driver: d1 })]} loading={false} error={false} />);
+    const { rerender } = render(
+      <TimingTower rows={[row({ position: 1, driver: d1 })]} loading={false} error={false} />,
+    );
     const tr = screen.getByText("LDR").closest("tr")!;
     expect(tr.className).not.toContain(styles.valueChanged);
 

@@ -38,6 +38,22 @@ class FixtureOpenF1Client implements OpenF1HttpClient {
         return intervals as T[];
       case "/stints":
         return stints as T[];
+      case "/session_result":
+        return [
+          {
+            session_key: 9574,
+            meeting_key: 1242,
+            driver_number: 1,
+            position: 1,
+            number_of_laps: 44,
+            points: 25,
+            dnf: false,
+            dns: false,
+            dsq: false,
+            duration: 4930.2,
+            gap_to_leader: 0,
+          },
+        ] as T[];
       case "/drivers_championship":
       case "/teams_championship":
         return []; // verified real behavior — see docs/CONTEXT.md §8
@@ -176,6 +192,27 @@ describe("OpenF1Adapter — F1-specific behavior, offline via FixtureOpenF1Clien
     expect(patches.some((p) => p.lastLapTime !== undefined)).toBe(true);
     expect(patches.some((p) => p.gapToLeader !== undefined)).toBe(true);
     expect(patches.some((p) => p.tyreCompound !== undefined)).toBe(true);
+  });
+
+  it("builds a normalized historical snapshot without replaying the position stream", async () => {
+    const calls: string[] = [];
+    const client: OpenF1HttpClient = {
+      async get<T>(path: string): Promise<T[]> {
+        calls.push(path);
+        return new FixtureOpenF1Client().get<T>(path);
+      },
+    };
+    const detail = await new OpenF1Adapter({ client }).getHistoricalSessionDetail("f1-session-9574");
+
+    expect(detail.players.some((player) => player.shortName === "VER")).toBe(true);
+    expect(detail.timingPatches).toContainEqual(
+      expect.objectContaining({ driverId: "f1-driver-1", position: 1, bestLapTime: expect.any(Number) }),
+    );
+    expect(detail.events.some((event) => event.eventType === "LAP_COMPLETED")).toBe(true);
+    expect(calls).toEqual(
+      expect.arrayContaining(["/drivers", "/session_result", "/race_control", "/laps", "/pit", "/stints"]),
+    );
+    expect(calls).not.toContain("/position");
   });
 });
 

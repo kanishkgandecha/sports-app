@@ -14,22 +14,17 @@ import type {
 /**
  * The one interface every provider adapter implements, regardless of sport
  * or vendor (ARCHITECTURE.md §3/§4). Application code — the ingestion
- * worker, the API — depends only on this. Swapping OpenF1 for Sportmonks,
- * or adding a second cricket vendor, is a new file implementing this
- * interface, never a change to the caller.
+ * worker, the API — depends only on this. Swapping the F1 vendor means
+ * implementing this interface, never changing the caller.
  */
 export interface SportsProvider {
-  /** Stable id for this (sport, vendor) pair, e.g. "openf1", "sportmonks-cricket". */
+  /** Stable provider id, for example "openf1". */
   readonly id: string;
   readonly sportId: string;
 
   getCompetitions(): Promise<Competition[]>;
   getSeasons(input: { competitionId: string }): Promise<Season[]>;
-  getFixtures(input: {
-    competitionId: string;
-    seasonId?: string;
-    status?: FixtureStatus;
-  }): Promise<Fixture[]>;
+  getFixtures(input: { competitionId: string; seasonId?: string; status?: FixtureStatus }): Promise<Fixture[]>;
   getSessions(input: { fixtureId: string }): Promise<Session[]>;
   getTeams(input?: { competitionId?: string }): Promise<Team[]>;
   getPlayers(input?: { teamId?: string }): Promise<Player[]>;

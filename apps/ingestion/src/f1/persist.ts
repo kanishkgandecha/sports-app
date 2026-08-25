@@ -85,7 +85,11 @@ export async function upsertDriverTiming(patch: DriverTimingPatch): Promise<void
     // error, which shouldn't take down the rest of the tick — see
     // docs/CONTEXT.md §9 "Error handling".
     logger.warn(
-      { sessionId: patch.sessionId, driverId: patch.driverId, error: error instanceof Error ? error.message : String(error) },
+      {
+        sessionId: patch.sessionId,
+        driverId: patch.driverId,
+        error: error instanceof Error ? error.message : String(error),
+      },
       "DriverTiming upsert failed",
     );
   }

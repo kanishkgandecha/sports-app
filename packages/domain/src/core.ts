@@ -4,15 +4,11 @@
  * Terminology (see ARCHITECTURE.md §5):
  *   Competition -> Season -> Fixture -> Session -> LiveEvent
  *
- * A Fixture is the schedulable, followable thing (a Grand Prix weekend, a
- * football match, a cricket match, an esports series). A Session is the
- * sport-specific unit that actually carries live state (an F1 practice
- * session, an esports map, a football match's single session). Football and
- * cricket usually collapse Fixture and Session into one; F1 and esports do
- * not. Nothing here should be widened to force that collapse either way.
+ * A Fixture is a Grand Prix weekend. A Session is practice, qualifying,
+ * sprint, or race activity inside that weekend.
  */
 
-export type SportSlug = "f1" | "cricket" | "football" | "esports";
+export type SportSlug = "f1";
 
 export type SportStatus = "live" | "beta" | "education-only";
 
@@ -44,19 +40,7 @@ export interface Season {
 export interface Venue {
   id: string;
   name: string;
-  /**
-   * Nullable since Cricket Checkpoint 1 (docs/CONTEXT.md) — the one core-
-   * model change that checkpoint made, and the only field relaxed: F1's
-   * OpenF1 always gives a real country per venue, but CricketData.org
-   * gives only a single free-text "ground, city" string (e.g. "MA
-   * Chidambaram Stadium, Chennai") with no separate country field at all —
-   * verified against real match data, not assumed. Guessing a country
-   * from a city name would need an external geo lookup this checkpoint
-   * doesn't have and shouldn't fabricate; storing `null` is the honest
-   * representation. F1 rows are unaffected — OpenF1Adapter still always
-   * populates a real value.
-   */
-  country: string | null;
+  country: string;
   timezone: string;
 }
 
@@ -125,6 +109,31 @@ export interface LiveEvent<TPayload = Record<string, unknown>> {
   payload: TPayload;
 }
 
+/** A persisted event carries the database-owned cursor used for SSE replay. */
+export interface SequencedLiveEvent<TPayload = Record<string, unknown>> extends LiveEvent<TPayload> {
+  /** Decimal string because JSON cannot safely encode a PostgreSQL bigint. */
+  sequence: string;
+}
+
+/**
+ * Runtime validation for untrusted transport boundaries (NOTIFY and SSE).
+ * Provider-specific payloads intentionally remain opaque, but the shared
+ * envelope must be complete and internally usable before application code
+ * accepts it.
+ */
+export function parseLiveEvent(value: unknown): LiveEvent | SequencedLiveEvent | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const requiredStrings = ["id", "sportId", "sessionId", "eventType", "timestamp", "source"] as const;
+  if (requiredStrings.some((key) => typeof candidate[key] !== "string" || candidate[key].length === 0)) return null;
+  if (!Number.isFinite(Date.parse(candidate.timestamp as string))) return null;
+  if (!("payload" in candidate)) return null;
+  if ("sequence" in candidate && (typeof candidate.sequence !== "string" || !/^[1-9]\d*$/.test(candidate.sequence))) {
+    return null;
+  }
+  return candidate as unknown as LiveEvent | SequencedLiveEvent;
+}
+
 export type StandingEntityType = "team" | "player";
 
 export interface Standing {
@@ -181,11 +190,7 @@ export function classifySessionLifecycle(
   return "live";
 }
 
-export function computeFreshness(input: {
-  lastEventAt: string | null;
-  isLive: boolean;
-  now?: number;
-}): FreshnessInfo {
+export function computeFreshness(input: { lastEventAt: string | null; isLive: boolean; now?: number }): FreshnessInfo {
   const now = input.now ?? Date.now();
 
   if (!input.isLive) {

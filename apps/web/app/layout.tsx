@@ -4,8 +4,8 @@ import { SiteNav } from "../components/nav/SiteNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Sports Platform",
-  description: "Live sports tracking and sports education, one sport at a time.",
+  title: { default: "F1 Race Center", template: "%s — F1 Race Center" },
+  description: "Formula 1 timing, results, standings, archives, and plain-language race education.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -2,6 +2,7 @@ import type { SportsProvider } from "@sports/providers-core";
 import { config } from "../config";
 import { logger } from "../logger";
 import { syncF1Standings } from "./standings";
+import { scheduleLoop, type ScheduledLoop } from "../scheduleLoop";
 
 /**
  * Runs an immediate standings sync, then repeats on its own interval
@@ -12,7 +13,7 @@ import { syncF1Standings } from "./standings";
  * Checkpoint 6 §4). A failed tick is logged and never stops the interval,
  * same error-isolation posture as `runF1Job`'s poll loop (./job.ts).
  */
-export async function runF1StandingsJob(provider: SportsProvider, seasonLabels: string[]): Promise<void> {
+export async function runF1StandingsJob(provider: SportsProvider, seasonLabels: string[]): Promise<ScheduledLoop> {
   const tick = async () => {
     try {
       await syncF1Standings(provider, { seasonLabels });
@@ -22,5 +23,5 @@ export async function runF1StandingsJob(provider: SportsProvider, seasonLabels: 
   };
 
   await tick();
-  setInterval(tick, config.f1StandingsPollIntervalMs);
+  return scheduleLoop(tick, config.f1StandingsPollIntervalMs);
 }

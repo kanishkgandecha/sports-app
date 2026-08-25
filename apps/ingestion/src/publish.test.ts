@@ -36,12 +36,24 @@ describe("publishLiveEvent (integration, real Postgres)", () => {
     const competition = await prisma.competition.upsert({
       where: { id: "publish-test-competition" },
       update: {},
-      create: { id: "publish-test-competition", sportId: sport.id, slug: "publish-test-competition", name: "Test", type: "championship" },
+      create: {
+        id: "publish-test-competition",
+        sportId: sport.id,
+        slug: "publish-test-competition",
+        name: "Test",
+        type: "championship",
+      },
     });
     const season = await prisma.season.upsert({
       where: { id: "publish-test-season" },
       update: {},
-      create: { id: "publish-test-season", competitionId: competition.id, label: "2099", startDate: new Date("2099-01-01"), endDate: new Date("2099-12-31") },
+      create: {
+        id: "publish-test-season",
+        competitionId: competition.id,
+        label: "2099",
+        startDate: new Date("2099-01-01"),
+        endDate: new Date("2099-12-31"),
+      },
     });
     const fixture = await prisma.fixture.upsert({
       where: { id: "publish-test-fixture" },
@@ -60,7 +72,13 @@ describe("publishLiveEvent (integration, real Postgres)", () => {
     await prisma.session.upsert({
       where: { id: SESSION_ID },
       update: {},
-      create: { id: SESSION_ID, fixtureId: fixture.id, type: "RACE", status: "live", startTime: new Date("2099-01-01") },
+      create: {
+        id: SESSION_ID,
+        fixtureId: fixture.id,
+        type: "RACE",
+        status: "live",
+        startTime: new Date("2099-01-01"),
+      },
     });
   });
 
@@ -71,11 +89,12 @@ describe("publishLiveEvent (integration, real Postgres)", () => {
     await prisma.fixture.deleteMany({ where: { id: "publish-test-fixture" } });
     await prisma.season.deleteMany({ where: { id: "publish-test-season" } });
     await prisma.competition.deleteMany({ where: { id: "publish-test-competition" } });
+    await prisma.sport.deleteMany({ where: { slug: SPORT_SLUG } });
   });
 
   it("reports created: true on first insert", async () => {
     const result = await publishLiveEvent(event("publish-test-1"));
-    expect(result).toEqual({ created: true });
+    expect(result).toEqual({ created: true, sequence: expect.stringMatching(/^[1-9]\d*$/) });
   });
 
   it("reports created: false and does not duplicate the row on a repeat of the same event id", async () => {

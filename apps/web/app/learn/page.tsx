@@ -3,7 +3,7 @@ import { apiGet } from "../../lib/api";
 import { LearnGrid } from "./LearnGrid";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = { title: "Learn — Sports Platform" };
+export const metadata: Metadata = { title: "Learn F1" };
 
 interface ConceptSummary {
   slug: string;
@@ -21,13 +21,7 @@ async function getF1Concepts(): Promise<ConceptSummary[]> {
   }
 }
 
-/**
- * The glossary, as its own destination — not just contextual chips inside
- * a live session. F1-only today (the only sport with real seeded
- * content); this page reads whatever `/api/education/:sport/concepts`
- * actually has, so a future Cricket concept set appears here automatically
- * once it exists, with no page-level code change.
- */
+/** The Formula 1 glossary as a standalone companion to contextual explanations. */
 export default async function LearnPage() {
   const concepts = await getF1Concepts();
 
@@ -35,13 +29,13 @@ export default async function LearnPage() {
     <>
       <h1 className={styles.title}>Learn</h1>
       <p className={styles.lede}>
-        Plain-language explanations for the things that happen live — browse them here, or tap
-        &quot;What does this mean?&quot; wherever they come up during a session.
+        Plain-language explanations for the things that happen live — browse them here, or tap &quot;What does this
+        mean?&quot; wherever they come up during a session.
       </p>
       {concepts.length === 0 ? (
         <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
-          No concepts loaded — start the API (see README) to populate this from the education
-          content in content/education/.
+          No concepts loaded — start the API (see README) to populate this from the education content in
+          content/education/.
         </p>
       ) : (
         <LearnGrid concepts={concepts} />

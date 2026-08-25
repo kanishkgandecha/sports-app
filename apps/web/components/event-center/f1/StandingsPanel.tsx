@@ -81,7 +81,9 @@ export function StandingsPanel({ year, onExplain }: { year: number; onExplain: (
           type="button"
           role="tab"
           aria-selected={kind === "drivers"}
-          className={[styles.standingsToggleButton, kind === "drivers" ? styles.standingsToggleButtonActive : ""].join(" ")}
+          className={[styles.standingsToggleButton, kind === "drivers" ? styles.standingsToggleButtonActive : ""].join(
+            " ",
+          )}
           onClick={() => setKind("drivers")}
         >
           Drivers
@@ -90,7 +92,10 @@ export function StandingsPanel({ year, onExplain }: { year: number; onExplain: (
           type="button"
           role="tab"
           aria-selected={kind === "constructors"}
-          className={[styles.standingsToggleButton, kind === "constructors" ? styles.standingsToggleButtonActive : ""].join(" ")}
+          className={[
+            styles.standingsToggleButton,
+            kind === "constructors" ? styles.standingsToggleButtonActive : "",
+          ].join(" ")}
           onClick={() => setKind("constructors")}
         >
           Constructors
@@ -100,13 +105,25 @@ export function StandingsPanel({ year, onExplain }: { year: number; onExplain: (
       {kind === "drivers" ? (
         <DriverStandingsTable rows={drivers.items} loading={drivers.loading} error={drivers.error} />
       ) : (
-        <ConstructorStandingsTable rows={constructors.items} loading={constructors.loading} error={constructors.error} />
+        <ConstructorStandingsTable
+          rows={constructors.items}
+          loading={constructors.loading}
+          error={constructors.error}
+        />
       )}
     </section>
   );
 }
 
-function DriverStandingsTable({ rows, loading, error }: { rows: F1DriverStanding[]; loading: boolean; error: boolean }) {
+function DriverStandingsTable({
+  rows,
+  loading,
+  error,
+}: {
+  rows: F1DriverStanding[];
+  loading: boolean;
+  error: boolean;
+}) {
   if (loading) return <StateView kind="loading">Loading driver standings…</StateView>;
   if (error) return <StateView kind="error">Driver standings aren&apos;t available right now.</StateView>;
   if (rows.length === 0) return <StateView kind="empty">No driver standings yet for this season.</StateView>;
@@ -124,12 +141,21 @@ function DriverStandingsTable({ rows, loading, error }: { rows: F1DriverStanding
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.driver.id} className={[styles.timingRow, row.position === 1 ? styles.leaderRow : ""].filter(Boolean).join(" ")}>
+            <tr
+              key={row.driver.id}
+              className={[styles.timingRow, row.position === 1 ? styles.leaderRow : ""].filter(Boolean).join(" ")}
+            >
               <td className={styles.position}>{row.position}</td>
               <td>
                 <div className={styles.driverCell}>
-                  <span className={styles.teamSwatch} style={{ background: row.team?.colorHex ?? "var(--color-border)" }} aria-hidden="true" />
-                  <span className={styles.driverCode}>{row.driver.shortName ?? row.driver.name.slice(0, 3).toUpperCase()}</span>
+                  <span
+                    className={styles.teamSwatch}
+                    style={{ background: row.team?.colorHex ?? "var(--color-border)" }}
+                    aria-hidden="true"
+                  />
+                  <span className={styles.driverCode}>
+                    {row.driver.shortName ?? row.driver.name.slice(0, 3).toUpperCase()}
+                  </span>
                   <span className={styles.driverFullName}>{row.team?.name ?? row.driver.name}</span>
                 </div>
               </td>
@@ -143,7 +169,15 @@ function DriverStandingsTable({ rows, loading, error }: { rows: F1DriverStanding
   );
 }
 
-function ConstructorStandingsTable({ rows, loading, error }: { rows: F1ConstructorStanding[]; loading: boolean; error: boolean }) {
+function ConstructorStandingsTable({
+  rows,
+  loading,
+  error,
+}: {
+  rows: F1ConstructorStanding[];
+  loading: boolean;
+  error: boolean;
+}) {
   if (loading) return <StateView kind="loading">Loading constructor standings…</StateView>;
   if (error) return <StateView kind="error">Constructor standings aren&apos;t available right now.</StateView>;
   if (rows.length === 0) return <StateView kind="empty">No constructor standings yet for this season.</StateView>;
@@ -161,11 +195,18 @@ function ConstructorStandingsTable({ rows, loading, error }: { rows: F1Construct
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.team.id} className={[styles.timingRow, row.position === 1 ? styles.leaderRow : ""].filter(Boolean).join(" ")}>
+            <tr
+              key={row.team.id}
+              className={[styles.timingRow, row.position === 1 ? styles.leaderRow : ""].filter(Boolean).join(" ")}
+            >
               <td className={styles.position}>{row.position}</td>
               <td>
                 <div className={styles.driverCell}>
-                  <span className={styles.teamSwatch} style={{ background: row.team.colorHex ?? "var(--color-border)" }} aria-hidden="true" />
+                  <span
+                    className={styles.teamSwatch}
+                    style={{ background: row.team.colorHex ?? "var(--color-border)" }}
+                    aria-hidden="true"
+                  />
                   <span className={styles.driverFullName}>{row.team.name}</span>
                 </div>
               </td>

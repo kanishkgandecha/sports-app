@@ -165,14 +165,14 @@ export interface OpenF1SessionResult {
   position: number | null;
   number_of_laps: number;
   /** Present on Race sessions — points earned in this specific session, not season total. */
-  points: number | null;
+  points?: number | null;
   dnf: boolean;
   dns: boolean;
   dsq: boolean;
   /** Best lap time (practice/qualifying) or total race time in seconds (races). */
-  duration: number | null;
+  duration: number | Array<number | null> | null;
   /** Numeric seconds, or "+N LAP(S)" string, or literal 0 for the session leader. */
-  gap_to_leader: number | string | null;
+  gap_to_leader: number | string | Array<number | null> | null;
 }
 
 /**

@@ -6,10 +6,17 @@
     "node": ">=22.6"
   },
   "packageManager": "pnpm@9.15.9",
+  "pnpm": {
+    "overrides": {
+      "deepmerge-ts": "^8.0.0"
+    }
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "turbo run lint",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "db:generate": "pnpm --filter @sports/db exec prisma generate",
@@ -17,7 +24,14 @@
     "db:seed": "pnpm --filter @sports/db exec tsx prisma/seed.ts"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
     "turbo": "^2.5.8",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.67.0"
   }
 }

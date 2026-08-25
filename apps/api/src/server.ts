@@ -1,6 +1,7 @@
 import { buildApp } from "./app.js";
+import { readApiConfig } from "./config.js";
 
-const port = Number(process.env.API_PORT ?? 4000);
+const { port } = readApiConfig();
 const databaseUrl = process.env.DATABASE_URL;
 
 async function main() {

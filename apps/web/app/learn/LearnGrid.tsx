@@ -38,9 +38,7 @@ export function LearnGrid({ concepts }: { concepts: ConceptSummary[] }) {
         ))}
       </div>
 
-      {openSlug && (
-        <GlossaryDrawer slug={openSlug} onClose={() => setOpenSlug(null)} onNavigate={setOpenSlug} />
-      )}
+      {openSlug && <GlossaryDrawer slug={openSlug} onClose={() => setOpenSlug(null)} onNavigate={setOpenSlug} />}
     </>
   );
 }

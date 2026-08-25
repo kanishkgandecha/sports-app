@@ -33,6 +33,7 @@ import {
   normalizePitStop,
   normalizeStint,
   positionTimingPatch,
+  sessionResultTimingPatch,
 } from "./normalize/timing";
 import { normalizeChampionshipEntry } from "./normalize/standing";
 import type {
@@ -45,8 +46,16 @@ import type {
   OpenF1Position,
   OpenF1RaceControlMessage,
   OpenF1Session,
+  OpenF1SessionResult,
   OpenF1Stint,
 } from "./types";
+
+export interface OpenF1HistoricalSessionDetail {
+  teams: Team[];
+  players: Player[];
+  events: LiveEvent[];
+  timingPatches: DriverTimingPatch[];
+}
 
 /**
  * OpenF1-backed `SportsProvider` (Checkpoint 3 — see docs/CONTEXT.md §8;
@@ -82,9 +91,7 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
   }
 
   async getSeasons(_input: { competitionId: string }): Promise<Season[]> {
-    const meetings = await this.timed("getSeasons", () =>
-      this.client.get<OpenF1Meeting>("/meetings"),
-    );
+    const meetings = await this.timed("getSeasons", () => this.client.get<OpenF1Meeting>("/meetings"));
     const byYear = new Map<number, OpenF1Meeting[]>();
     for (const meeting of meetings) {
       const list = byYear.get(meeting.year) ?? [];
@@ -104,15 +111,9 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
     });
   }
 
-  async getFixtures(input: {
-    competitionId: string;
-    seasonId?: string;
-    status?: FixtureStatus;
-  }): Promise<Fixture[]> {
+  async getFixtures(input: { competitionId: string; seasonId?: string; status?: FixtureStatus }): Promise<Fixture[]> {
     const year = input.seasonId ? yearFromSeasonId(input.seasonId) : new Date().getFullYear();
-    const meetings = await this.timed("getFixtures", () =>
-      this.client.get<OpenF1Meeting>("/meetings", { year }),
-    );
+    const meetings = await this.timed("getFixtures", () => this.client.get<OpenF1Meeting>("/meetings", { year }));
     const fixtures = meetings.map((meeting) =>
       normalizeMeeting(meeting, { competitionId: F1_COMPETITION.id, seasonId: buildSeasonId(year) }),
     );
@@ -128,19 +129,79 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
   }
 
   /**
+   * One completed-session snapshot for the archive. Unlike `pollLiveEvents`,
+   * this avoids position-stream replay and duplicate endpoint reads: final
+   * classification comes from `/session_result`, while laps, pits, and race
+   * control retain the useful historical event detail.
+   */
+  async getHistoricalSessionDetail(sessionId: string): Promise<OpenF1HistoricalSessionDetail> {
+    const sessionKey = sessionKeyFromSessionId(sessionId);
+    const [drivers, results, raceControl, laps, pits, stints] = await this.timed("getHistoricalSessionDetail", () =>
+      Promise.all([
+        this.client.get<OpenF1Driver>("/drivers", { session_key: sessionKey }),
+        this.client.get<OpenF1SessionResult>("/session_result", { session_key: sessionKey }),
+        this.client.get<OpenF1RaceControlMessage>("/race_control", { session_key: sessionKey }),
+        this.client.get<OpenF1Lap>("/laps", { session_key: sessionKey }),
+        this.client.get<OpenF1Pit>("/pit", { session_key: sessionKey }),
+        this.client.get<OpenF1Stint>("/stints", { session_key: sessionKey }),
+      ]),
+    );
+
+    const teams = [...new Map(drivers.map((driver) => [normalizeTeam(driver).id, normalizeTeam(driver)])).values()];
+    const players = drivers.map(normalizePlayer);
+    const events: LiveEvent[] = raceControl.map((message) => normalizeRaceControlEvent(message, { sessionId }));
+    for (const lap of laps) {
+      const event = normalizeLap(lap, { sessionId });
+      if (event) events.push(event as unknown as LiveEvent);
+    }
+    for (const pit of pits) {
+      const event = normalizePitStop(pit, { sessionId });
+      if (event) events.push(event as unknown as LiveEvent);
+    }
+    events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    const patches = new Map<string, DriverTimingPatch>();
+    const merge = (patch: DriverTimingPatch) => {
+      patches.set(patch.driverId, { ...patches.get(patch.driverId), ...patch });
+    };
+    results.forEach((result) => merge(sessionResultTimingPatch(result, sessionId)));
+
+    const lapsByDriver = new Map<number, OpenF1Lap[]>();
+    for (const lap of laps) {
+      const list = lapsByDriver.get(lap.driver_number) ?? [];
+      list.push(lap);
+      lapsByDriver.set(lap.driver_number, list);
+    }
+    for (const driverLaps of lapsByDriver.values()) {
+      const latest = driverLaps.reduce((candidate, lap) => (lap.lap_number > candidate.lap_number ? lap : candidate));
+      const completed = driverLaps.filter((lap) => lap.lap_duration !== null);
+      const best = completed.reduce<OpenF1Lap | undefined>(
+        (candidate, lap) => (!candidate || lap.lap_duration! < candidate.lap_duration! ? lap : candidate),
+        undefined,
+      );
+      merge({ ...lapTimingPatch(latest, sessionId), ...(best && { bestLapTime: best.lap_duration }) });
+    }
+
+    const finalStints = new Map<number, OpenF1Stint>();
+    for (const stint of stints) {
+      const current = finalStints.get(stint.driver_number);
+      if (!current || stint.stint_number > current.stint_number) finalStints.set(stint.driver_number, stint);
+    }
+    finalStints.forEach((stint) => merge(normalizeStint(stint, sessionId)));
+
+    return { teams, players, events, timingPatches: [...patches.values()] };
+  }
+
+  /**
    * Ingestion has to call this *before* `getFixtures` when bootstrapping, so
    * `Fixture.venueId` has a real row to reference (FK) — this adapter can't
    * decide that ordering on its own, only expose the data.
    */
   async getVenues(input?: { competitionId?: string; seasonId?: string }): Promise<Venue[]> {
     const year = input?.seasonId ? yearFromSeasonId(input.seasonId) : new Date().getFullYear();
-    const meetings = await this.timed("getVenues", () =>
-      this.client.get<OpenF1Meeting>("/meetings", { year }),
-    );
+    const meetings = await this.timed("getVenues", () => this.client.get<OpenF1Meeting>("/meetings", { year }));
     const seen = new Set<string>();
-    return meetings
-      .map(normalizeVenue)
-      .filter((venue) => (seen.has(venue.id) ? false : (seen.add(venue.id), true)));
+    return meetings.map(normalizeVenue).filter((venue) => (seen.has(venue.id) ? false : (seen.add(venue.id), true)));
   }
 
   /** TTL cache for `getReferenceDrivers()` — see that method's doc comment. */
@@ -163,9 +224,7 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
     const now = Date.now();
     const started = sessions.filter((s) => new Date(s.date_start).getTime() <= now);
     const pool = started.length > 0 ? started : sessions;
-    return pool.reduce((latest, s) =>
-      new Date(s.date_start) > new Date(latest.date_start) ? s : latest,
-    );
+    return pool.reduce((latest, s) => (new Date(s.date_start) > new Date(latest.date_start) ? s : latest));
   }
 
   /**
@@ -182,7 +241,10 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
    */
   private async getReferenceDrivers(): Promise<OpenF1Driver[]> {
     const now = Date.now();
-    if (this.referenceDriversCache && now - this.referenceDriversCache.fetchedAt < OpenF1Adapter.REFERENCE_DRIVERS_TTL_MS) {
+    if (
+      this.referenceDriversCache &&
+      now - this.referenceDriversCache.fetchedAt < OpenF1Adapter.REFERENCE_DRIVERS_TTL_MS
+    ) {
       return this.referenceDriversCache.drivers;
     }
 
@@ -197,9 +259,7 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
   async getTeams(_input?: { competitionId?: string }): Promise<Team[]> {
     const drivers = await this.timed("getTeams", () => this.getReferenceDrivers());
     const seen = new Set<string>();
-    return drivers
-      .map(normalizeTeam)
-      .filter((team) => (seen.has(team.id) ? false : (seen.add(team.id), true)));
+    return drivers.map(normalizeTeam).filter((team) => (seen.has(team.id) ? false : (seen.add(team.id), true)));
   }
 
   async getPlayers(input?: { teamId?: string }): Promise<Player[]> {

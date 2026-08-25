@@ -1,0 +1,8 @@
+node_modules
+**/.next
+**/dist
+**/coverage
+**/generated
+**/fixtures
+pnpm-lock.yaml
+docs/CONTEXT.md

@@ -21,7 +21,9 @@ describe("RaceControlFeed", () => {
   });
 
   it("renders only real backend messages, verbatim", () => {
-    render(<RaceControlFeed messages={[msg({ message: "RED FLAG" })]} loading={false} error={false} onExplain={vi.fn()} />);
+    render(
+      <RaceControlFeed messages={[msg({ message: "RED FLAG" })]} loading={false} error={false} onExplain={vi.fn()} />,
+    );
     expect(screen.getByText("RED FLAG")).toBeInTheDocument();
   });
 
@@ -41,12 +43,16 @@ describe("RaceControlFeed", () => {
   });
 
   it("does not show an education chip for a generic message with no mapped concept", () => {
-    render(<RaceControlFeed messages={[msg({ category: "message" })]} loading={false} error={false} onExplain={vi.fn()} />);
+    render(
+      <RaceControlFeed messages={[msg({ category: "message" })]} loading={false} error={false} onExplain={vi.fn()} />,
+    );
     expect(screen.queryByText(/what does this mean/i)).not.toBeInTheDocument();
   });
 
   it("carries the semantic category as a data attribute for the visual state (border color)", () => {
-    render(<RaceControlFeed messages={[msg({ category: "red_flag" })]} loading={false} error={false} onExplain={vi.fn()} />);
+    render(
+      <RaceControlFeed messages={[msg({ category: "red_flag" })]} loading={false} error={false} onExplain={vi.fn()} />,
+    );
     const item = screen.getByText("SESSION STARTED").closest("li");
     expect(item).toHaveAttribute("data-category", "red_flag");
   });

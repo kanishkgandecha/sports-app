@@ -21,7 +21,7 @@ describe("venueLine", () => {
   });
 
   it("returns just the name, never a dangling ', ', when country is null", () => {
-    expect(venueLine({ name: "Namibia Cricket Ground", country: null })).toBe("Namibia Cricket Ground");
+    expect(venueLine({ name: "Unknown circuit", country: null })).toBe("Unknown circuit");
   });
 
   it("returns null when there is no venue at all", () => {

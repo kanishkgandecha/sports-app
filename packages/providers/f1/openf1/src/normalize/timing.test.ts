@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { OpenF1Interval, OpenF1Lap, OpenF1Pit, OpenF1Position, OpenF1Stint } from "../types";
+import type { OpenF1Interval, OpenF1Lap, OpenF1Pit, OpenF1Position, OpenF1SessionResult, OpenF1Stint } from "../types";
 import {
   diffPosition,
   formatGap,
@@ -8,6 +8,7 @@ import {
   normalizeLap,
   normalizePitStop,
   normalizeStint,
+  sessionResultTimingPatch,
 } from "./timing";
 import lapFixture from "../fixtures/laps.sample.json";
 import pitFixture from "../fixtures/pit.belgium2024race.json";
@@ -86,6 +87,50 @@ describe("diffPosition", () => {
   });
 });
 
+describe("sessionResultTimingPatch", () => {
+  it("uses the completed-session classification without inventing a result", () => {
+    const result: OpenF1SessionResult = {
+      session_key: 9574,
+      meeting_key: 1242,
+      driver_number: 1,
+      position: 1,
+      number_of_laps: 44,
+      points: 25,
+      dnf: false,
+      dns: false,
+      dsq: false,
+      duration: 4930.2,
+      gap_to_leader: 0,
+    };
+    expect(sessionResultTimingPatch(result, "f1-session-9574")).toMatchObject({
+      driverId: "f1-driver-1",
+      position: 1,
+      gapToLeader: "0.000",
+      state: "running",
+    });
+    expect(sessionResultTimingPatch({ ...result, position: null, dnf: true }, "f1-session-9574")).toMatchObject({
+      position: 0,
+      state: "dnf",
+    });
+  });
+
+  it("uses the last non-null phase gap returned by qualifying sessions", () => {
+    const result: OpenF1SessionResult = {
+      session_key: 11344,
+      meeting_key: 1292,
+      driver_number: 11,
+      position: 21,
+      number_of_laps: 7,
+      dnf: false,
+      dns: false,
+      dsq: false,
+      duration: [75.545, null, null],
+      gap_to_leader: [2.534, null, null],
+    };
+    expect(sessionResultTimingPatch(result, "f1-session-11344").gapToLeader).toBe("+2.534");
+  });
+});
+
 describe("normalizePitStop — resolved from real evidence (see fixtures/README.md)", () => {
   it("prefers pit_duration, which was verified equal to lane_duration in every real sample", () => {
     const pit = realPits.find((p) => p.pit_duration !== null)!;
@@ -95,10 +140,7 @@ describe("normalizePitStop — resolved from real evidence (see fixtures/README.
   });
 
   it("emits nothing when both pit_duration and lane_duration are null, never fabricating a duration", () => {
-    const event = normalizePitStop(
-      { ...realPits[0], pit_duration: null, lane_duration: null },
-      { sessionId: "s" },
-    );
+    const event = normalizePitStop({ ...realPits[0], pit_duration: null, lane_duration: null }, { sessionId: "s" });
     expect(event).toBeNull();
   });
 

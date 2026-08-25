@@ -29,7 +29,13 @@ describe("upsertRaceControlMessage (integration, real Postgres)", () => {
   });
 
   it("does not duplicate the same provider event processed twice", async () => {
-    const row = { id: "rc-1", sessionId: SESSION_ID, timestamp: "2026-01-01T00:00:00Z", category: "red_flag" as const, message: "RED FLAG" };
+    const row = {
+      id: "rc-1",
+      sessionId: SESSION_ID,
+      timestamp: "2026-01-01T00:00:00Z",
+      category: "red_flag" as const,
+      message: "RED FLAG",
+    };
     await upsertRaceControlMessage(row);
     await upsertRaceControlMessage(row);
     const rows = await prisma.raceControlMessage.findMany({ where: { sessionId: SESSION_ID } });
@@ -55,7 +61,14 @@ describe("upsertPitStop (integration, real Postgres)", () => {
   });
 
   it("does not duplicate the same pit stop processed twice", async () => {
-    const row = { id: "pit-1", sessionId: SESSION_ID, driverId: "f1-driver-1", lap: 12, durationMs: 23500, timestamp: "2026-01-01T00:00:00Z" };
+    const row = {
+      id: "pit-1",
+      sessionId: SESSION_ID,
+      driverId: "f1-driver-1",
+      lap: 12,
+      durationMs: 23500,
+      timestamp: "2026-01-01T00:00:00Z",
+    };
     await upsertPitStop(row);
     await upsertPitStop(row);
     const rows = await prisma.pitStop.findMany({ where: { sessionId: SESSION_ID } });

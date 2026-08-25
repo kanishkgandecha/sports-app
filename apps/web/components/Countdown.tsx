@@ -13,22 +13,7 @@ function formatRemaining(ms: number): string {
   return `${minutes}m`;
 }
 
-/**
- * A live-updating countdown to a fixture/session's start — moved here from
- * `app/sports/f1/Countdown.tsx` in Cricket Checkpoint 3, the same "second
- * real consumer" trigger that moved `GlossaryDrawer`/`StateView` in
- * Cricket Checkpoint 2 (docs/CONTEXT.md). The logic (day/hour/minute
- * bucketing, "Live now" once the target passes, and — the part actually
- * worth not duplicating — rendering `—` until the first client tick to
- * avoid a server/client hydration mismatch on a value that depends on
- * "now") was already sport-agnostic; only its `f1Landing.module.css`
- * import was F1-specific. Callers supply their own `valueClassName` for
- * sizing/typography rather than this component assuming any — F1 and
- * Cricket's landing pages each keep their own visual language.
- *
- * Ticks once a minute, not every second: seconds-level precision would
- * churn far more than a "starts in 2d 4h" figure needs.
- */
+/** Live countdown that delays its first value until hydration and ticks once a minute. */
 export function Countdown({ targetIso, valueClassName }: { targetIso: string; valueClassName?: string }) {
   const [now, setNow] = useState<number | null>(null);
 

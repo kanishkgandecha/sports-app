@@ -79,7 +79,9 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard),
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard);
 }
 
@@ -314,7 +316,9 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard),
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard);
 }
 
@@ -425,10 +429,7 @@
   border-top: 1px solid var(--color-border);
 }
 
-/* Education (educationTrigger) and drawer classes, and state-view
-   (loading/empty/error) classes moved to ../sharedEventCenter.module.css
-   in Cricket Checkpoint 2 — see that file's header comment. GlossaryDrawer
-   and StateView both import from there now, not from here. */
+/* Education drawer and state-view classes live in sharedEventCenter.module.css. */
 
 /* ---- responsive: mobile ---------------------------------------------------- */
 

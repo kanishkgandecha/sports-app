@@ -98,7 +98,7 @@ describe("normalizeConstructorStanding — real 2026 constructor standings", () 
     expect(standing.entityId).toBe("f1-team-red-bull-racing");
   });
 
-  it("resolves rb (\"RB F1 Team\") to our real f1-team-racing-bulls slug — the mismatch where even the display name differs", () => {
+  it('resolves rb ("RB F1 Team") to our real f1-team-racing-bulls slug — the mismatch where even the display name differs', () => {
     const rb = constructorStandings.find((c) => c.Constructor.constructorId === "rb")!;
     const standing = normalizeConstructorStanding(rb, input);
     expect(standing.entityId).toBe("f1-team-racing-bulls");

@@ -18,14 +18,16 @@ interface ConceptDetail {
  * button), never blocks the live view underneath it, and never auto-opens
  * (Checkpoint 5 §12 — education must never interrupt someone who already
  * understands the sport).
- *
- * Moved here from event-center/f1/ in Cricket Checkpoint 2 — this was
- * already sport-agnostic in logic (ARCHITECTURE.md §2's education layer
- * sits above live-data, below any sport skin), it just had nowhere else to
- * live until a second sport actually needed it. Styles moved with it into
- * sharedEventCenter.module.css, unchanged, so F1's rendering is identical.
  */
-export function GlossaryDrawer({ slug, onClose, onNavigate }: { slug: string; onClose: () => void; onNavigate: (slug: string) => void }) {
+export function GlossaryDrawer({
+  slug,
+  onClose,
+  onNavigate,
+}: {
+  slug: string;
+  onClose: () => void;
+  onNavigate: (slug: string) => void;
+}) {
   const [data, setData] = useState<ConceptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -49,7 +51,6 @@ export function GlossaryDrawer({ slug, onClose, onNavigate }: { slug: string; on
     // drawer instance persists across in-drawer "related concept"
     // navigation (onNavigate), which must NOT re-trigger this and steal
     // focus back to the close button mid-read.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Minimal, scoped Tab-wrap for this one drawer — not a generic reusable
@@ -112,8 +113,9 @@ export function GlossaryDrawer({ slug, onClose, onNavigate }: { slug: string; on
 
   return (
     <>
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div className={styles.drawerOverlay} onClick={onClose} aria-hidden="true" />
+      {/* The dialog owns a scoped Tab focus trap; keyboard handling belongs on this semantic container. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <aside
         ref={drawerRef}
         className={styles.drawer}

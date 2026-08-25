@@ -1,87 +1,50 @@
-import { FakeSportsProvider } from "@sports/providers-core";
-import { bootstrapFromProvider } from "./bootstrapSynthetic.js";
-import { publishLiveEvent } from "./publish.js";
-import { config } from "./config";
-import { logger } from "./logger";
-import { resolveF1Provider, resolveF1StandingsProvider, resolveCricketProvider } from "./providers/registry";
+import { prisma } from "@sports/db";
 import { runF1Job } from "./f1/job";
 import { runF1StandingsJob } from "./f1/standingsJob";
-import { runCricketJob } from "./cricket/job";
+import { logger } from "./logger";
+import { resolveF1Provider, resolveF1StandingsProvider } from "./providers/registry";
+import type { ScheduledLoop } from "./scheduleLoop";
+import { config } from "./config";
 
-/**
- * Independent jobs run in this one process, selected by configuration
- * (docs/CONTEXT.md §9 "Architecture") — not a single hardcoded provider:
- *
- * 1. The Phase 0 synthetic health-check job — UNCHANGED from Checkpoint 3.
- *    It stays exactly as it was; "the synthetic job stays as a standing
- *    pipeline health check" (this file's original comment) still holds.
- * 2. The F1 job (Checkpoint 4, new) — full-calendar bootstrap, then
- *    active-session polling. See apps/ingestion/src/f1/job.ts.
- * 3. The F1 standings sync (Checkpoint 6, new) — an independent job on its
- *    own interval, using Jolpica-F1 rather than the live-data provider
- *    (OpenF1). See apps/ingestion/src/f1/standingsJob.ts and
- *    docs/CONTEXT.md Checkpoint 6 §4.
- * 4. The Cricket job (Phase 2 Checkpoint 1, new) — current-matches
- *    bootstrap, then active-innings polling, using CricketData.org (the
- *    approved development provider). Disabled by default, unlike every F1
- *    job — see config.ts's `cricketProvider` doc comment for why (a real,
- *    confirmed 100 req/day rate limit). See apps/ingestion/src/cricket/job.ts.
- */
-async function runSyntheticJob() {
-  const provider = new FakeSportsProvider();
-  const { session } = await bootstrapFromProvider(provider);
-  console.log(`[ingestion] synthetic session ready: ${session.id}`);
-  console.log(`[ingestion] emitting one synthetic LiveEvent every ${config.syntheticPollIntervalMs}ms`);
-
-  setInterval(async () => {
-    try {
-      const events = await provider.pollLiveEvents({ sessionId: session.id });
-      for (const event of events) {
-        await publishLiveEvent(event);
-        console.log(`[ingestion] published ${event.eventType} (${event.id})`);
-      }
-    } catch (error) {
-      console.error("[ingestion] poll tick failed", error);
-    }
-  }, config.syntheticPollIntervalMs);
-}
-
+/** Runs the two independent Formula 1 ingestion loops: live/session data and championship standings. */
 async function main() {
-  await runSyntheticJob();
+  const activeLoops: ScheduledLoop[] = [];
+  const pendingStarts: Promise<unknown>[] = [];
+  let shuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info({ signal }, "ingestion shutdown started");
+    await Promise.allSettled(pendingStarts);
+    await Promise.allSettled(activeLoops.map((loop) => loop.stop()));
+    await prisma.$disconnect();
+    logger.info("ingestion shutdown complete");
+  };
+  process.once("SIGTERM", () => void shutdown("SIGTERM"));
+  process.once("SIGINT", () => void shutdown("SIGINT"));
 
   const f1Provider = resolveF1Provider();
   if (f1Provider) {
     logger.info({ provider: f1Provider.id }, "starting F1 job");
-    // Not awaited: the F1 job's bootstrap + polling loop runs for the life
-    // of the process, same as the synthetic job's setInterval above. A
-    // rejection inside it is caught internally per-session/per-tick (see
-    // job.ts) and must never take down the synthetic job running alongside it.
-    runF1Job(f1Provider).catch((error) => {
-      logger.error({ error: error instanceof Error ? error.message : String(error) }, "F1 job crashed");
-    });
+    pendingStarts.push(
+      runF1Job(f1Provider)
+        .then((loop) => activeLoops.push(loop))
+        .catch((error) => {
+          logger.error({ error: error instanceof Error ? error.message : String(error) }, "F1 job crashed");
+        }),
+    );
   }
 
-  const f1StandingsProvider = resolveF1StandingsProvider();
-  if (f1StandingsProvider) {
-    logger.info({ provider: f1StandingsProvider.id }, "starting F1 standings sync job");
-    // Not awaited, same reasoning as the F1 job above — runs for the life of
-    // the process on its own interval; a failed tick is caught internally
-    // (standingsJob.ts) and must never take down the other jobs.
-    runF1StandingsJob(f1StandingsProvider, config.f1StandingsSeasons).catch((error) => {
-      logger.error({ error: error instanceof Error ? error.message : String(error) }, "F1 standings job crashed");
-    });
-  }
-
-  const cricketProvider = resolveCricketProvider();
-  if (cricketProvider) {
-    logger.info({ provider: cricketProvider.id }, "starting Cricket job");
-    // Not awaited, same reasoning as the F1/standings jobs above — runs
-    // for the life of the process on its own interval; a failed tick is
-    // caught internally (cricket/job.ts) and must never take down the
-    // other jobs.
-    runCricketJob(cricketProvider).catch((error) => {
-      logger.error({ error: error instanceof Error ? error.message : String(error) }, "Cricket job crashed");
-    });
+  const standingsProvider = resolveF1StandingsProvider();
+  if (standingsProvider) {
+    logger.info({ provider: standingsProvider.id }, "starting F1 standings sync job");
+    pendingStarts.push(
+      runF1StandingsJob(standingsProvider, config.f1StandingsSeasons)
+        .then((loop) => activeLoops.push(loop))
+        .catch((error) => {
+          logger.error({ error: error instanceof Error ? error.message : String(error) }, "F1 standings job crashed");
+        }),
+    );
   }
 }
 

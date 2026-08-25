@@ -1,5 +1,5 @@
 import type { LiveEvent, f1 } from "@sports/domain";
-import type { OpenF1Interval, OpenF1Lap, OpenF1Pit, OpenF1Position, OpenF1Stint } from "../types";
+import type { OpenF1Interval, OpenF1Lap, OpenF1Pit, OpenF1Position, OpenF1SessionResult, OpenF1Stint } from "../types";
 import { F1_SPORT_ID, buildDriverId, buildSessionId } from "../reference";
 
 /** Partial current-state patch — ingestion (Checkpoint 5) upserts these into `DriverTiming`. */
@@ -18,10 +18,7 @@ export function formatGap(value: number | string | null): string | null {
   return `+${value.toFixed(3)}`;
 }
 
-export function normalizeLap(
-  lap: OpenF1Lap,
-  input: { sessionId?: string },
-): LiveEvent<f1.LapCompletedPayload> | null {
+export function normalizeLap(lap: OpenF1Lap, input: { sessionId?: string }): LiveEvent<f1.LapCompletedPayload> | null {
   // Out-laps and in-progress laps often have no lap_duration yet — a
   // deliberate "no event" rather than fabricating a 0 or null-as-zero time.
   if (lap.lap_duration === null) return null;
@@ -98,6 +95,20 @@ export function positionTimingPatch(position: OpenF1Position, sessionId: string)
   };
 }
 
+/** Final classified position/state from OpenF1's completed-session result endpoint. */
+export function sessionResultTimingPatch(result: OpenF1SessionResult, sessionId: string): DriverTimingPatch {
+  const gap = Array.isArray(result.gap_to_leader)
+    ? ([...result.gap_to_leader].reverse().find((value) => value !== null) ?? null)
+    : result.gap_to_leader;
+  return {
+    sessionId,
+    driverId: buildDriverId(result.driver_number),
+    position: result.position ?? 0,
+    gapToLeader: formatGap(gap),
+    state: result.dsq ? "dsq" : result.dns ? "dns" : result.dnf ? "dnf" : "running",
+  };
+}
+
 export function intervalTimingPatch(interval: OpenF1Interval, sessionId: string): DriverTimingPatch {
   return {
     sessionId,
@@ -107,10 +118,7 @@ export function intervalTimingPatch(interval: OpenF1Interval, sessionId: string)
   };
 }
 
-export function normalizePitStop(
-  pit: OpenF1Pit,
-  input: { sessionId?: string },
-): LiveEvent<f1.PitStopPayload> | null {
+export function normalizePitStop(pit: OpenF1Pit, input: { sessionId?: string }): LiveEvent<f1.PitStopPayload> | null {
   // Verified against real data (see docs/CONTEXT.md §8): pit_duration and
   // lane_duration are consistently equal when present; stop_duration was
   // null in every sample checked. Prefer pit_duration, fall back to

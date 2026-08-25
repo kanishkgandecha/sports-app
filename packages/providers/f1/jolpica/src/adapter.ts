@@ -71,11 +71,7 @@ export class JolpicaAdapter extends BaseProviderAdapter implements SportsProvide
       }));
   }
 
-  async getFixtures(input: {
-    competitionId: string;
-    seasonId?: string;
-    status?: FixtureStatus;
-  }): Promise<Fixture[]> {
+  async getFixtures(input: { competitionId: string; seasonId?: string; status?: FixtureStatus }): Promise<Fixture[]> {
     const year = input.seasonId ? yearFromSeasonId(input.seasonId) : new Date().getFullYear();
     const races = await this.timed("getFixtures", () => this.client.getRaces(year));
     const fixtures = races.map((race) =>
@@ -96,9 +92,7 @@ export class JolpicaAdapter extends BaseProviderAdapter implements SportsProvide
     const year = input?.seasonId ? yearFromSeasonId(input.seasonId) : new Date().getFullYear();
     const races = await this.timed("getVenues", () => this.client.getRaces(year));
     const seen = new Set<string>();
-    return races
-      .map(normalizeVenue)
-      .filter((venue) => (seen.has(venue.id) ? false : (seen.add(venue.id), true)));
+    return races.map(normalizeVenue).filter((venue) => (seen.has(venue.id) ? false : (seen.add(venue.id), true)));
   }
 
   /** Roster approximation from the current season's constructor standings — see normalize/roster.ts's doc comment. */
@@ -115,9 +109,7 @@ export class JolpicaAdapter extends BaseProviderAdapter implements SportsProvide
   async getPlayers(input?: { teamId?: string }): Promise<Player[]> {
     const year = new Date().getFullYear();
     const standings = await this.timed("getPlayers", () => this.client.getDriverStandings(year));
-    const players = standings
-      .map(normalizePlayerFromStanding)
-      .filter((p): p is Player => p !== undefined);
+    const players = standings.map(normalizePlayerFromStanding).filter((p): p is Player => p !== undefined);
     return input?.teamId ? players.filter((p) => p.teamId === input.teamId) : players;
   }
 

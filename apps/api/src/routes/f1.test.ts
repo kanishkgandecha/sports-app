@@ -40,12 +40,24 @@ async function seed() {
   const competition = await prisma.competition.upsert({
     where: { id: "api-test-competition" },
     update: {},
-    create: { id: "api-test-competition", sportId: sport.id, slug: "api-test-competition", name: "Test Championship", type: "championship" },
+    create: {
+      id: "api-test-competition",
+      sportId: sport.id,
+      slug: "api-test-competition",
+      name: "Test Championship",
+      type: "championship",
+    },
   });
   const season = await prisma.season.upsert({
     where: { id: "api-test-season" },
     update: {},
-    create: { id: "api-test-season", competitionId: competition.id, label: "2099", startDate: new Date("2099-01-01"), endDate: new Date("2099-12-31") },
+    create: {
+      id: "api-test-season",
+      competitionId: competition.id,
+      label: "2099",
+      startDate: new Date("2099-01-01"),
+      endDate: new Date("2099-12-31"),
+    },
   });
   const venue = await prisma.venue.upsert({
     where: { id: "api-test-venue" },
@@ -97,18 +109,46 @@ async function seed() {
   await prisma.team.upsert({
     where: { id: TEAM_ID },
     update: {},
-    create: { id: TEAM_ID, sportId: sport.id, name: "Test Racing", slug: "api-test-racing", country: null, colorHex: "#112233" },
+    create: {
+      id: TEAM_ID,
+      sportId: sport.id,
+      name: "Test Racing",
+      slug: "api-test-racing",
+      country: null,
+      colorHex: "#112233",
+    },
   });
   await prisma.player.upsert({
     where: { id: DRIVER_ID },
     update: {},
-    create: { id: DRIVER_ID, sportId: sport.id, teamId: TEAM_ID, name: "Test Driver", role: "driver", shortName: "TST", avatarUrl: null },
+    create: {
+      id: DRIVER_ID,
+      sportId: sport.id,
+      teamId: TEAM_ID,
+      name: "Test Driver",
+      role: "driver",
+      shortName: "TST",
+      avatarUrl: null,
+    },
   });
 
   await prisma.driverTiming.upsert({
     where: { sessionId_driverId: { sessionId: SESSION_ID, driverId: DRIVER_ID } },
     update: {},
-    create: { sessionId: SESSION_ID, driverId: DRIVER_ID, position: 1, gapToLeader: "0.000", intervalToAhead: null, lastLapTime: 88.123, bestLapTime: 87.5, sector1: 28.1, sector2: 29.2, sector3: 30.4, tyreCompound: "SOFT", state: "running" },
+    create: {
+      sessionId: SESSION_ID,
+      driverId: DRIVER_ID,
+      position: 1,
+      gapToLeader: "0.000",
+      intervalToAhead: null,
+      lastLapTime: 88.123,
+      bestLapTime: 87.5,
+      sector1: 28.1,
+      sector2: 29.2,
+      sector3: 30.4,
+      tyreCompound: "SOFT",
+      state: "running",
+    },
   });
   // A timing row for a driver with no bootstrapped Player row — tests the "unknown driver" fallback.
   await prisma.driverTiming.upsert({
@@ -120,13 +160,26 @@ async function seed() {
   await prisma.raceControlMessage.upsert({
     where: { id: "api-test-rc-1" },
     update: {},
-    create: { id: "api-test-rc-1", sessionId: SESSION_ID, timestamp: new Date("2020-01-01T00:30:00Z"), category: "safety_car", message: "SAFETY CAR DEPLOYED" },
+    create: {
+      id: "api-test-rc-1",
+      sessionId: SESSION_ID,
+      timestamp: new Date("2020-01-01T00:30:00Z"),
+      category: "safety_car",
+      message: "SAFETY CAR DEPLOYED",
+    },
   });
 
   await prisma.pitStop.upsert({
     where: { id: "api-test-pit-1" },
     update: {},
-    create: { id: "api-test-pit-1", sessionId: SESSION_ID, driverId: DRIVER_ID, lap: 12, durationMs: 23500, timestamp: new Date("2020-01-01T00:45:00Z") },
+    create: {
+      id: "api-test-pit-1",
+      sessionId: SESSION_ID,
+      driverId: DRIVER_ID,
+      lap: 12,
+      durationMs: 23500,
+      timestamp: new Date("2020-01-01T00:45:00Z"),
+    },
   });
 
   await seedStandings();
@@ -146,39 +199,104 @@ async function seedStandings() {
   await prisma.competition.upsert({
     where: { id: "f1-world-championship" },
     update: {},
-    create: { id: "f1-world-championship", sportId: sport.id, slug: "f1-world-championship", name: "FIA Formula One World Championship", type: "championship" },
+    create: {
+      id: "f1-world-championship",
+      sportId: sport.id,
+      slug: "f1-world-championship",
+      name: "FIA Formula One World Championship",
+      type: "championship",
+    },
   });
   await prisma.season.upsert({
     where: { id: STANDINGS_SEASON_ID },
     update: {},
-    create: { id: STANDINGS_SEASON_ID, competitionId: "f1-world-championship", label: STANDINGS_SEASON_LABEL, startDate: new Date("2091-01-01"), endDate: new Date("2091-12-31") },
+    create: {
+      id: STANDINGS_SEASON_ID,
+      competitionId: "f1-world-championship",
+      label: STANDINGS_SEASON_LABEL,
+      startDate: new Date("2091-01-01"),
+      endDate: new Date("2091-12-31"),
+    },
   });
   await prisma.team.upsert({
     where: { id: STANDINGS_TEAM_ID },
     update: {},
-    create: { id: STANDINGS_TEAM_ID, sportId: sport.id, name: "Standings Test Racing", slug: "standings-test-racing", country: null, colorHex: "#445566" },
+    create: {
+      id: STANDINGS_TEAM_ID,
+      sportId: sport.id,
+      name: "Standings Test Racing",
+      slug: "standings-test-racing",
+      country: null,
+      colorHex: "#445566",
+    },
   });
   await prisma.player.upsert({
     where: { id: STANDINGS_DRIVER_ID },
     update: {},
-    create: { id: STANDINGS_DRIVER_ID, sportId: sport.id, teamId: STANDINGS_TEAM_ID, name: "Standings Test Driver", role: "driver", shortName: "STD", avatarUrl: null },
+    create: {
+      id: STANDINGS_DRIVER_ID,
+      sportId: sport.id,
+      teamId: STANDINGS_TEAM_ID,
+      name: "Standings Test Driver",
+      role: "driver",
+      shortName: "STD",
+      avatarUrl: null,
+    },
   });
 
   await prisma.standing.upsert({
-    where: { seasonId_entityType_entityId: { seasonId: STANDINGS_SEASON_ID, entityType: "player", entityId: STANDINGS_DRIVER_ID } },
+    where: {
+      seasonId_entityType_entityId: {
+        seasonId: STANDINGS_SEASON_ID,
+        entityType: "player",
+        entityId: STANDINGS_DRIVER_ID,
+      },
+    },
     update: {},
-    create: { competitionId: "f1-world-championship", seasonId: STANDINGS_SEASON_ID, entityType: "player", entityId: STANDINGS_DRIVER_ID, points: 150, position: 1, extra: { wins: 4, teamId: STANDINGS_TEAM_ID } },
+    create: {
+      competitionId: "f1-world-championship",
+      seasonId: STANDINGS_SEASON_ID,
+      entityType: "player",
+      entityId: STANDINGS_DRIVER_ID,
+      points: 150,
+      position: 1,
+      extra: { wins: 4, teamId: STANDINGS_TEAM_ID },
+    },
   });
   // A standing for a driver with no bootstrapped Player row — tests the "unknown driver" fallback, same as the timing endpoint.
   await prisma.standing.upsert({
-    where: { seasonId_entityType_entityId: { seasonId: STANDINGS_SEASON_ID, entityType: "player", entityId: STANDINGS_DRIVER_UNKNOWN_ID } },
+    where: {
+      seasonId_entityType_entityId: {
+        seasonId: STANDINGS_SEASON_ID,
+        entityType: "player",
+        entityId: STANDINGS_DRIVER_UNKNOWN_ID,
+      },
+    },
     update: {},
-    create: { competitionId: "f1-world-championship", seasonId: STANDINGS_SEASON_ID, entityType: "player", entityId: STANDINGS_DRIVER_UNKNOWN_ID, points: 90, position: 2, extra: {} },
+    create: {
+      competitionId: "f1-world-championship",
+      seasonId: STANDINGS_SEASON_ID,
+      entityType: "player",
+      entityId: STANDINGS_DRIVER_UNKNOWN_ID,
+      points: 90,
+      position: 2,
+      extra: {},
+    },
   });
   await prisma.standing.upsert({
-    where: { seasonId_entityType_entityId: { seasonId: STANDINGS_SEASON_ID, entityType: "team", entityId: STANDINGS_TEAM_ID } },
+    where: {
+      seasonId_entityType_entityId: { seasonId: STANDINGS_SEASON_ID, entityType: "team", entityId: STANDINGS_TEAM_ID },
+    },
     update: {},
-    create: { competitionId: "f1-world-championship", seasonId: STANDINGS_SEASON_ID, entityType: "team", entityId: STANDINGS_TEAM_ID, points: 240, position: 1, extra: { wins: 6 } },
+    create: {
+      competitionId: "f1-world-championship",
+      seasonId: STANDINGS_SEASON_ID,
+      entityType: "team",
+      entityId: STANDINGS_TEAM_ID,
+      points: 240,
+      position: 1,
+      extra: { wins: 6 },
+    },
   });
 }
 
@@ -221,6 +339,7 @@ describe("F1 routes (integration, real Postgres)", () => {
     const fixture = body.fixtures.find((f: { id: string }) => f.id === FIXTURE_ID);
     expect(fixture).toBeDefined();
     expect(fixture.venue).toMatchObject({ name: "Test Circuit" });
+    expect(fixture.detailAvailable).toBe(true);
   });
 
   it("GET /api/f1/fixtures/:id returns the fixture with all of its sessions, ordered", async () => {
@@ -229,6 +348,11 @@ describe("F1 routes (integration, real Postgres)", () => {
     const body = res.json();
     expect(body.fixture.id).toBe(FIXTURE_ID);
     expect(body.sessions.map((s: { id: string }) => s.id)).toEqual([SESSION_ID, LIVE_SESSION_ID]);
+    expect(body.fixture.detailAvailable).toBe(true);
+    expect(body.sessions).toEqual([
+      expect.objectContaining({ id: SESSION_ID, detailAvailable: true }),
+      expect.objectContaining({ id: LIVE_SESSION_ID, detailAvailable: false }),
+    ]);
   });
 
   it("GET /api/f1/fixtures/:id 404s for an unknown fixture rather than returning null fields", async () => {
@@ -241,6 +365,7 @@ describe("F1 routes (integration, real Postgres)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.session.lifecycle).toBe("completed");
+    expect(body.session.detailAvailable).toBe(true);
     expect(body.freshness.state).toBe("offline"); // never LIVE/DELAYED for a non-live session
   });
 
@@ -248,6 +373,7 @@ describe("F1 routes (integration, real Postgres)", () => {
     const res = await app.inject({ method: "GET", url: `/api/f1/sessions/${LIVE_SESSION_ID}` });
     const body = res.json();
     expect(body.session.lifecycle).toBe("live");
+    expect(body.session.detailAvailable).toBe(false);
     expect(body.freshness.state).toBe("offline"); // live session, but genuinely no data — not fabricated as LIVE
   });
 
@@ -268,7 +394,13 @@ describe("F1 routes (integration, real Postgres)", () => {
     const res = await app.inject({ method: "GET", url: `/api/f1/sessions/${SESSION_ID}/timing` });
     const body = res.json();
     const unknown = body.timing.find((t: { position: number }) => t.position === 2);
-    expect(unknown.driver).toEqual({ id: UNKNOWN_DRIVER_ID, name: UNKNOWN_DRIVER_ID, shortName: null, avatarUrl: null, team: null });
+    expect(unknown.driver).toEqual({
+      id: UNKNOWN_DRIVER_ID,
+      name: UNKNOWN_DRIVER_ID,
+      shortName: null,
+      avatarUrl: null,
+      team: null,
+    });
   });
 
   it("GET /api/f1/sessions/:sessionId/race-control returns real seeded messages, never invented ones", async () => {
@@ -276,7 +408,12 @@ describe("F1 routes (integration, real Postgres)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.messages).toEqual([
-      { id: "api-test-rc-1", timestamp: "2020-01-01T00:30:00.000Z", category: "safety_car", message: "SAFETY CAR DEPLOYED" },
+      {
+        id: "api-test-rc-1",
+        timestamp: "2020-01-01T00:30:00.000Z",
+        category: "safety_car",
+        message: "SAFETY CAR DEPLOYED",
+      },
     ]);
   });
 
@@ -308,24 +445,39 @@ describe("F1 routes (integration, real Postgres)", () => {
       driver: { id: STANDINGS_DRIVER_ID, name: "Standings Test Driver", shortName: "STD", avatarUrl: null },
       team: { id: STANDINGS_TEAM_ID, name: "Standings Test Racing", colorHex: "#445566" },
     });
-    expect(body.standings.every((s: Record<string, unknown>) => !("movement" in s) && !("positionChange" in s))).toBe(true);
+    expect(body.standings.every((s: Record<string, unknown>) => !("movement" in s) && !("positionChange" in s))).toBe(
+      true,
+    );
   });
 
   it("GET /api/f1/seasons/:year/standings/drivers degrades gracefully for a standing with no bootstrapped Player row, and reports wins:null when extra has none", async () => {
     const res = await app.inject({ method: "GET", url: `/api/f1/seasons/${STANDINGS_SEASON_LABEL}/standings/drivers` });
     const body = res.json();
     const unknown = body.standings.find((s: { position: number }) => s.position === 2);
-    expect(unknown.driver).toEqual({ id: STANDINGS_DRIVER_UNKNOWN_ID, name: STANDINGS_DRIVER_UNKNOWN_ID, shortName: null, avatarUrl: null });
+    expect(unknown.driver).toEqual({
+      id: STANDINGS_DRIVER_UNKNOWN_ID,
+      name: STANDINGS_DRIVER_UNKNOWN_ID,
+      shortName: null,
+      avatarUrl: null,
+    });
     expect(unknown.wins).toBeNull();
     expect(unknown.team).toBeNull();
   });
 
   it("GET /api/f1/seasons/:year/standings/constructors returns real constructor standings with team info joined", async () => {
-    const res = await app.inject({ method: "GET", url: `/api/f1/seasons/${STANDINGS_SEASON_LABEL}/standings/constructors` });
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/f1/seasons/${STANDINGS_SEASON_LABEL}/standings/constructors`,
+    });
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.standings).toEqual([
-      { position: 1, points: 240, wins: 6, team: { id: STANDINGS_TEAM_ID, name: "Standings Test Racing", colorHex: "#445566" } },
+      {
+        position: 1,
+        points: 240,
+        wins: 6,
+        team: { id: STANDINGS_TEAM_ID, name: "Standings Test Racing", colorHex: "#445566" },
+      },
     ]);
   });
 
@@ -337,7 +489,10 @@ describe("F1 routes (integration, real Postgres)", () => {
   });
 
   it("standings responses never leak a raw Jolpica constructorId or other provider-specific field", async () => {
-    const res = await app.inject({ method: "GET", url: `/api/f1/seasons/${STANDINGS_SEASON_LABEL}/standings/constructors` });
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/f1/seasons/${STANDINGS_SEASON_LABEL}/standings/constructors`,
+    });
     const text = res.body;
     expect(text).not.toContain("jolpicaConstructorId");
     expect(text).not.toContain("constructorId");

@@ -95,7 +95,9 @@ describe("useLiveSession", () => {
 
   it("seeds freshness from initialLastEventAt before any SSE event arrives", () => {
     const staleTimestamp = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const { result } = renderHook(() => useLiveSession("session-1", { isLive: true, initialLastEventAt: staleTimestamp }));
+    const { result } = renderHook(() =>
+      useLiveSession("session-1", { isLive: true, initialLastEventAt: staleTimestamp }),
+    );
     expect(result.current.freshness.state).toBe("offline"); // stale beyond the delayed threshold
     expect(result.current.freshness.updatedAt).toBe(staleTimestamp);
   });

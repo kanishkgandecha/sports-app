@@ -5,13 +5,7 @@ import styles from "../sharedEventCenter.module.css";
  * (Checkpoint 5 §16) — no browser alerts, no misleading zero-values shown
  * as if they were real data.
  */
-export function StateView({
-  kind,
-  children,
-}: {
-  kind: "loading" | "empty" | "error";
-  children: React.ReactNode;
-}) {
+export function StateView({ kind, children }: { kind: "loading" | "empty" | "error"; children: React.ReactNode }) {
   return (
     <div
       className={`${styles.stateView} ${kind === "error" ? styles.stateViewError : ""}`}

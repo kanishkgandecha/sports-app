@@ -15,7 +15,9 @@
   border-radius: var(--radius-full);
   padding: var(--space-2) var(--space-4);
   cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 
 .trigger:hover {

@@ -1,5 +1,5 @@
 import { Client } from "pg";
-import type { LiveEvent } from "@sports/domain";
+import { parseLiveEvent, type SequencedLiveEvent } from "@sports/domain";
 
 /**
  * The API side of ARCHITECTURE.md §4 "real-time delivery": one dedicated
@@ -10,37 +10,70 @@ import type { LiveEvent } from "@sports/domain";
  */
 export class LiveEventBus {
   private client: Client | undefined;
-  private readonly subscribers = new Map<string, Set<(event: LiveEvent) => void>>();
+  private readonly subscribers = new Map<string, Set<(event: SequencedLiveEvent) => void>>();
+  private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private reconnectAttempt = 0;
+  private closing = false;
 
   constructor(private readonly connectionString: string) {}
 
-  async connect(): Promise<void> {
-    this.client = new Client({ connectionString: this.connectionString });
-    await this.client.connect();
-    await this.client.query("LISTEN live_events");
+  get isConnected(): boolean {
+    return this.client !== undefined && !this.closing;
+  }
 
-    this.client.on("notification", (msg) => {
+  async connect(): Promise<void> {
+    this.closing = false;
+    await this.connectClient();
+  }
+
+  private async connectClient(): Promise<void> {
+    const client = new Client({ connectionString: this.connectionString });
+    try {
+      await client.connect();
+      await client.query("LISTEN live_events");
+    } catch (error) {
+      await client.end().catch(() => undefined);
+      throw error;
+    }
+    this.client = client;
+    this.reconnectAttempt = 0;
+
+    client.on("notification", (msg) => {
       if (!msg.payload) return;
-      let event: LiveEvent;
+      let parsed: unknown;
       try {
-        event = JSON.parse(msg.payload) as LiveEvent;
+        parsed = JSON.parse(msg.payload);
       } catch {
         return;
       }
+      const event = parseLiveEvent(parsed);
+      if (!event || !("sequence" in event)) return;
       const listeners = this.subscribers.get(event.sessionId);
       listeners?.forEach((listener) => listener(event));
     });
 
-    this.client.on("error", (err) => {
-      // A dropped LISTEN connection shouldn't crash the API process; the
-      // affected SSE streams will simply stop receiving updates until a
-      // future health check restarts this bus. Acceptable for Phase 0 —
-      // reconnect-with-backoff is a Phase 1 hardening item.
+    client.on("error", (err) => {
       console.error("[live-event-bus] connection error", err);
+      this.scheduleReconnect(client);
     });
+    client.on("end", () => this.scheduleReconnect(client));
   }
 
-  subscribe(sessionId: string, onEvent: (event: LiveEvent) => void): () => void {
+  private scheduleReconnect(failedClient?: Client): void {
+    if (this.closing || (failedClient && this.client !== failedClient) || this.reconnectTimer) return;
+    this.client = undefined;
+    const delayMs = Math.min(30_000, 500 * 2 ** this.reconnectAttempt++);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      this.connectClient().catch((error) => {
+        console.error("[live-event-bus] reconnect failed", error);
+        this.scheduleReconnect();
+      });
+    }, delayMs);
+    this.reconnectTimer.unref?.();
+  }
+
+  subscribe(sessionId: string, onEvent: (event: SequencedLiveEvent) => void): () => void {
     const listeners = this.subscribers.get(sessionId) ?? new Set();
     listeners.add(onEvent);
     this.subscribers.set(sessionId, listeners);
@@ -48,6 +81,11 @@ export class LiveEventBus {
   }
 
   async close(): Promise<void> {
-    await this.client?.end();
+    this.closing = true;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = undefined;
+    const client = this.client;
+    this.client = undefined;
+    await client?.end();
   }
 }

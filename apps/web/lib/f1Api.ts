@@ -27,6 +27,7 @@ export interface F1Fixture {
   status: string;
   startTime: string;
   venue: F1Venue | null;
+  detailAvailable: boolean;
 }
 
 export type F1SessionLifecycle = "upcoming" | "live" | "completed";
@@ -38,6 +39,7 @@ export interface F1Session {
   lifecycle: F1SessionLifecycle;
   startTime: string;
   endTime: string | null;
+  detailAvailable: boolean;
 }
 
 export interface F1DriverRef {
@@ -117,9 +119,7 @@ export function getF1Fixture(fixtureId: string) {
 }
 
 export function getF1Session(sessionId: string) {
-  return apiGet<{ session: F1Session; fixture: F1Fixture; freshness: F1Freshness }>(
-    `/api/f1/sessions/${sessionId}`,
-  );
+  return apiGet<{ session: F1Session; fixture: F1Fixture; freshness: F1Freshness }>(`/api/f1/sessions/${sessionId}`);
 }
 
 export function getF1Timing(sessionId: string) {

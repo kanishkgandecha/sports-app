@@ -32,11 +32,7 @@ function listDirs(root: string): string[] {
   }
 }
 
-function toConcept(
-  sport: string,
-  data: Record<string, unknown>,
-  content: string,
-): EducationConcept {
+function toConcept(sport: string, data: Record<string, unknown>, content: string): EducationConcept {
   const slug = String(data.slug ?? "");
   if (!slug) {
     throw new Error(`Education concept in sport "${sport}" is missing a "slug" in frontmatter`);

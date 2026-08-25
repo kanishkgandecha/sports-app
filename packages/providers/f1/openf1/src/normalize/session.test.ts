@@ -29,10 +29,7 @@ describe("normalizeSession — session_name vs session_type mapping", () => {
 
   it("falls back to a normalized raw name for an unrecognized session_name instead of throwing", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const session = normalizeSession(
-      { ...find("Race"), session_name: "Bonus Showdown" },
-      { fixtureId: "x" },
-    );
+    const session = normalizeSession({ ...find("Race"), session_name: "Bonus Showdown" }, { fixtureId: "x" });
     expect(session.type).toBe("BONUS_SHOWDOWN");
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
@@ -51,16 +48,12 @@ describe("deriveSessionStatus", () => {
   });
 
   it("is live between date_start and date_end", () => {
-    const midpoint = new Date(
-      (new Date(race.date_start).getTime() + new Date(race.date_end).getTime()) / 2,
-    );
+    const midpoint = new Date((new Date(race.date_start).getTime() + new Date(race.date_end).getTime()) / 2);
     expect(deriveSessionStatus(race, midpoint)).toBe("live");
   });
 
   it("is cancelled regardless of dates when is_cancelled is true", () => {
-    expect(deriveSessionStatus({ ...race, is_cancelled: true }, new Date(race.date_start))).toBe(
-      "cancelled",
-    );
+    expect(deriveSessionStatus({ ...race, is_cancelled: true }, new Date(race.date_start))).toBe("cancelled");
   });
 });
 
