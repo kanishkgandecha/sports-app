@@ -19,7 +19,7 @@
 # comment) — setting it at `docker run` time would have no effect. See
 # docs/CONTEXT.md, Checkpoint 7 §4.
 
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 RUN corepack enable
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -60,7 +60,7 @@ RUN turbo run build --filter=@sports/web...
 # needed, at the cost of some of `standalone`'s size-minimality, in
 # exchange for actually working. Still far smaller than shipping the whole
 # monorepo source tree the way apps/api/apps/ingestion's images do.
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 RUN addgroup -S sports && adduser -S sports -G sports
 WORKDIR /repo
 COPY --from=builder /repo/node_modules ./node_modules
