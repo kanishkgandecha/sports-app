@@ -21,8 +21,8 @@ content/education/f1     Formula 1 glossary content
 cp .env.example .env
 docker compose up -d postgres
 pnpm install
-pnpm --filter @sports/db exec prisma migrate deploy
-pnpm --filter @sports/db exec tsx prisma/seed.ts
+pnpm db:migrate:deploy
+pnpm db:seed
 ```
 
 Run these in separate terminals:
@@ -55,8 +55,10 @@ OpenF1 supplies session detail and Jolpica supplies historical/reference data an
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test
+pnpm test:unit
+pnpm test:integration
 pnpm build
 ```
 
-Integration tests require the local PostgreSQL service.
+Unit tests are database-independent. Integration tests fail fast with a clear
+prerequisite message unless the configured PostgreSQL service is reachable.

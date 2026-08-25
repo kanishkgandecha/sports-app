@@ -26,16 +26,16 @@ const SESSION_LABEL: Record<string, string> = {
   RACE: "Race",
 };
 
-async function getFixtures(): Promise<F1Fixture[]> {
+async function getFixtures(): Promise<{ fixtures: F1Fixture[]; unavailable: boolean }> {
   try {
     const results = await Promise.all([
       apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures?status=live&limit=5&order=desc"),
       apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures?status=scheduled&limit=8&order=asc"),
       apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures?status=completed&limit=6&order=desc"),
     ]);
-    return results.flatMap((result) => result.fixtures);
+    return { fixtures: results.flatMap((result) => result.fixtures), unavailable: false };
   } catch {
-    return [];
+    return { fixtures: [], unavailable: true };
   }
 }
 
@@ -61,7 +61,8 @@ function pickFeaturedSession(sessions: F1Session[]): F1Session | undefined {
  * literal order without dropping any of its sections.
  */
 export default async function F1LandingPage() {
-  const fixtures = await getFixtures();
+  const fixtureResult = await getFixtures();
+  const fixtures = fixtureResult.fixtures;
 
   const live = fixtures.filter((f) => f.status === "live");
   const upcoming = [...fixtures.filter((f) => f.status === "scheduled")].sort((a, b) =>
@@ -120,7 +121,9 @@ export default async function F1LandingPage() {
             <>
               <h1 className={styles.title}>Formula 1</h1>
               <p style={{ color: "var(--color-text-faint)" }}>
-                No F1 calendar loaded yet — start the ingestion worker (see README).
+                {fixtureResult.unavailable
+                  ? "The F1 calendar is temporarily unavailable. Please try again shortly."
+                  : "No F1 calendar has been imported yet."}
               </p>
             </>
           )}
@@ -148,9 +151,15 @@ export default async function F1LandingPage() {
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Championship snapshot</h2>
         </div>
-        {driverStandings.length === 0 && constructorStandings.length === 0 ? (
+        {(driverStandingsResult.status === "rejected" || constructorStandingsResult.status === "rejected") &&
+        driverStandings.length === 0 &&
+        constructorStandings.length === 0 ? (
           <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
-            No standings synced yet — start the ingestion worker (see README).
+            Championship standings are temporarily unavailable.
+          </p>
+        ) : driverStandings.length === 0 && constructorStandings.length === 0 ? (
+          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
+            No championship standings have been imported yet.
           </p>
         ) : (
           <div className={styles.standingsGrid}>

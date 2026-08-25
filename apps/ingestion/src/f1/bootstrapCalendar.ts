@@ -14,11 +14,8 @@ export interface BootstrapSummary {
 }
 
 /**
- * Full-calendar bootstrap — fixes the Phase 0 limitation identified at
- * Checkpoint 2/3 (docs/CONTEXT.md §7.5): the old `bootstrapFromProvider`
- * (still used by the synthetic job, untouched) only ever processed the
- * first competition/season/fixture/session. This one processes everything
- * the provider returns for the configured season(s).
+ * Full-calendar bootstrap. It processes everything the provider returns for
+ * the configured season(s) and is safe to rerun for periodic reconciliation.
  *
  * Idempotent by construction, not by an added uniqueness check: every
  * entity here gets its `id` from the provider adapter's own deterministic

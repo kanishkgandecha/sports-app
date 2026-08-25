@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { prisma, type Prisma } from "@sports/db";
+import { deriveF1FixtureStatus } from "./f1Lifecycle.js";
 
 const STATUSES = new Set(["scheduled", "live", "completed", "postponed", "cancelled"]);
 type ArchiveQuery = {
@@ -26,7 +27,6 @@ export async function archiveRoutes(app: FastifyInstance) {
       ...(filters.q ? { name: { contains: filters.q, mode: "insensitive" } } : {}),
       ...(filters.season ? { seasonId: filters.season } : {}),
       ...(filters.competition ? { competitionId: filters.competition } : {}),
-      ...(filters.status ? { status: filters.status } : {}),
       ...(filters.from || filters.to
         ? {
             startTime: {
@@ -35,27 +35,32 @@ export async function archiveRoutes(app: FastifyInstance) {
             },
           }
         : {}),
-      ...(cursor
-        ? {
-            OR: [
-              { startTime: { lt: new Date(cursor.startTime) } },
-              { startTime: new Date(cursor.startTime), id: { lt: cursor.id } },
-            ],
-          }
-        : {}),
     };
     const rows = await prisma.fixture.findMany({
       where,
-      take: limit + 1,
       orderBy: [{ startTime: "desc" }, { id: "desc" }],
-      include: { season: true, competition: true, venue: true, dataProfile: true },
+      include: {
+        season: true,
+        competition: true,
+        venue: true,
+        dataProfile: true,
+        sessions: { select: { id: true, startTime: true, endTime: true } },
+      },
     });
-    const hasNextPage = rows.length > limit;
-    const page = rows.slice(0, limit);
-    const sessions = await prisma.session.findMany({
-      where: { fixtureId: { in: page.map((row) => row.id) } },
-      select: { id: true, fixtureId: true },
-    });
+    const matchingRows = rows
+      .map((fixture) => ({ fixture, effectiveStatus: deriveF1FixtureStatus(fixture) }))
+      .filter(({ effectiveStatus }) => !filters.status || effectiveStatus === filters.status)
+      .filter(
+        ({ fixture }) =>
+          !cursor ||
+          fixture.startTime < new Date(cursor.startTime) ||
+          (fixture.startTime.getTime() === new Date(cursor.startTime).getTime() && fixture.id < cursor.id),
+      );
+    const hasNextPage = matchingRows.length > limit;
+    const page = matchingRows.slice(0, limit);
+    const sessions = page.flatMap(({ fixture }) =>
+      fixture.sessions.map((session) => ({ id: session.id, fixtureId: fixture.id })),
+    );
     const fixtureBySession = new Map(sessions.map((session) => [session.id, session.fixtureId]));
     const detailRows = await prisma.driverTiming.findMany({
       where: { sessionId: { in: sessions.map((session) => session.id) } },
@@ -65,12 +70,12 @@ export async function archiveRoutes(app: FastifyInstance) {
     const detailIds = new Set(
       detailRows.map((row) => fixtureBySession.get(row.sessionId)).filter((id): id is string => Boolean(id)),
     );
-    const last = page.at(-1);
+    const last = page.at(-1)?.fixture;
     return {
-      fixtures: page.map((fixture) => ({
+      fixtures: page.map(({ fixture, effectiveStatus }) => ({
         id: fixture.id,
         name: fixture.name,
-        status: fixture.status,
+        status: effectiveStatus,
         startTime: fixture.startTime.toISOString(),
         season: { id: fixture.season.id, label: fixture.season.label },
         competition: {

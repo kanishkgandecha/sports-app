@@ -19,9 +19,12 @@
     "format:check": "prettier --check .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:unit": "turbo run test",
+    "test:integration": "node scripts/require-database-url.mjs && turbo run test:integration",
     "db:generate": "pnpm --filter @sports/db exec prisma generate",
-    "db:migrate": "pnpm --filter @sports/db exec prisma migrate dev",
-    "db:seed": "pnpm --filter @sports/db exec tsx prisma/seed.ts"
+    "db:migrate": "node --env-file=.env scripts/run-with-root-env.mjs pnpm --filter @sports/db exec prisma migrate dev",
+    "db:migrate:deploy": "node --env-file=.env scripts/run-with-root-env.mjs pnpm --filter @sports/db exec prisma migrate deploy",
+    "db:seed": "node --env-file=.env scripts/run-with-root-env.mjs pnpm --filter @sports/db exec tsx prisma/seed.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

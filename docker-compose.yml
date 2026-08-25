@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: sports
       POSTGRES_DB: sports_platform_dev
     ports:
-      - "5432:5432"
+      # 5433 avoids colliding with a developer's native PostgreSQL service.
+      - "5433:5432"
     volumes:
       - sports-platform-db-data:/var/lib/postgresql/data
     healthcheck:

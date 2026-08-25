@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@sports/db";
 import { classifySessionLifecycle, computeFreshness, type FreshnessInfo } from "@sports/domain";
+import { deriveF1FixtureStatus } from "./f1Lifecycle.js";
 
 /**
  * F1 read endpoints for the Event Center (Checkpoint 5 — docs/CONTEXT.md
@@ -25,19 +26,23 @@ export async function f1Routes(app: FastifyInstance) {
         return reply.code(400).send({ error: "order must be asc or desc" });
       const order: "asc" | "desc" = req.query.order === "asc" ? "asc" : "desc";
       const fixtures = await prisma.fixture.findMany({
-        where: { sport: { slug: "f1" }, ...(req.query.status ? { status: req.query.status } : {}) },
+        where: { sport: { slug: "f1" } },
         orderBy: { startTime: order },
-        take: limit,
-        include: { venue: true, sessions: { select: { id: true } } },
+        ...(req.query.status ? {} : { take: limit }),
+        include: { venue: true, sessions: { select: { id: true, startTime: true, endTime: true } } },
       });
       const detailIds = await detailedF1SessionIds(fixtures.flatMap((fixture) => fixture.sessions.map((s) => s.id)));
       return {
-        fixtures: fixtures.map((fixture) =>
-          toFixtureSummary(
-            fixture,
-            fixture.sessions.some((session) => detailIds.has(session.id)),
-          ),
-        ),
+        fixtures: fixtures
+          .map((fixture) =>
+            toFixtureSummary(
+              fixture,
+              fixture.sessions.some((session) => detailIds.has(session.id)),
+              deriveF1FixtureStatus(fixture),
+            ),
+          )
+          .filter((fixture) => !req.query.status || fixture.status === req.query.status)
+          .slice(0, limit),
       };
     },
   );
@@ -57,6 +62,7 @@ export async function f1Routes(app: FastifyInstance) {
       fixture: toFixtureSummary(
         fixture,
         fixture.sessions.some((session) => detailIds.has(session.id)),
+        deriveF1FixtureStatus(fixture),
       ),
       sessions: fixture.sessions.map((session) => toSessionSummary(session, detailIds.has(session.id))),
     };
@@ -65,7 +71,11 @@ export async function f1Routes(app: FastifyInstance) {
   app.get<{ Params: { sessionId: string } }>("/api/f1/sessions/:sessionId", async (req, reply) => {
     const session = await prisma.session.findUnique({
       where: { id: req.params.sessionId },
-      include: { fixture: { include: { venue: true } } },
+      include: {
+        fixture: {
+          include: { venue: true, sessions: { select: { startTime: true, endTime: true } } },
+        },
+      },
     });
     if (!session) {
       return reply.code(404).send({ error: `No session "${req.params.sessionId}"` });
@@ -75,7 +85,7 @@ export async function f1Routes(app: FastifyInstance) {
     const detailIds = await detailedF1SessionIds([session.id]);
     return {
       session: toSessionSummary(session, detailIds.has(session.id)),
-      fixture: toFixtureSummary(session.fixture, detailIds.has(session.id)),
+      fixture: toFixtureSummary(session.fixture, detailIds.has(session.id), deriveF1FixtureStatus(session.fixture)),
       freshness,
     };
   });
@@ -318,12 +328,13 @@ function toFixtureSummary(
     venue: { id: string; name: string; country: string; timezone: string } | null;
   },
   detailAvailable = false,
+  status = fixture.status,
 ) {
   return {
     id: fixture.id,
     slug: fixture.slug,
     name: fixture.name,
-    status: fixture.status,
+    status,
     startTime: fixture.startTime.toISOString(),
     venue: fixture.venue,
     detailAvailable,

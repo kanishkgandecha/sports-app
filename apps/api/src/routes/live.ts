@@ -40,10 +40,7 @@ function writeEvent(reply: { raw: NodeJS.WritableStream }, event: SequencedLiveE
 
 /**
  * SSE delivery per ARCHITECTURE.md §4: one stream per session, fed by
- * LiveEventBus (which itself is fed by Postgres LISTEN/NOTIFY). This is the
- * Phase 0 exit criterion endpoint — a synthetic event reaching the browser
- * here in ~1s is what proves the pipeline before Phase 1 touches real F1
- * data.
+ * LiveEventBus (which itself is fed by Postgres LISTEN/NOTIFY).
  */
 export async function liveRoutes(app: FastifyInstance, bus: LiveEventBus) {
   app.get<{ Params: { sessionId: string }; Querystring: { after?: string } }>(

@@ -301,6 +301,7 @@ async function seedStandings() {
 }
 
 async function cleanup() {
+  if (!process.env.DATABASE_URL) return;
   await prisma.driverTiming.deleteMany({ where: { sessionId: { in: [SESSION_ID, LIVE_SESSION_ID] } } });
   await prisma.pitStop.deleteMany({ where: { sessionId: { in: [SESSION_ID, LIVE_SESSION_ID] } } });
   await prisma.raceControlMessage.deleteMany({ where: { sessionId: { in: [SESSION_ID, LIVE_SESSION_ID] } } });
@@ -328,7 +329,7 @@ describe("F1 routes (integration, real Postgres)", () => {
     app = await buildApp(process.env.DATABASE_URL!);
   });
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
     await cleanup();
   });
 

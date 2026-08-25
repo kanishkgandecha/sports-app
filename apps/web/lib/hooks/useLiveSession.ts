@@ -57,7 +57,7 @@ export function useLiveSession(sessionId: string | null, options: UseLiveSession
   }, []);
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!sessionId || !isLive) {
       setConnectionState("closed");
       return;
     }
@@ -109,7 +109,7 @@ export function useLiveSession(sessionId: string | null, options: UseLiveSession
       if (reconnectTimer) clearTimeout(reconnectTimer);
       source?.close();
     };
-  }, [sessionId]);
+  }, [sessionId, isLive]);
 
   const freshness = computeFreshness({ lastEventAt, isLive, now });
 

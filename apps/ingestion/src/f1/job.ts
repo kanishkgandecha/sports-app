@@ -48,8 +48,7 @@ export async function runF1Job(provider: SportsProvider): Promise<ScheduledLoop>
   } catch (error) {
     // A failed bootstrap means there's nothing to poll yet — log loudly and
     // let the next tick's poll loop find zero active sessions rather than
-    // crashing the whole ingestion worker (the synthetic job must keep
-    // running regardless — see docs/CONTEXT.md §9 "Error handling").
+    // crashing the ingestion worker. A later reconciliation tick can recover.
     logger.error({ error: error instanceof Error ? error.message : String(error) }, "F1 calendar bootstrap failed");
   }
 
@@ -59,7 +58,7 @@ export async function runF1Job(provider: SportsProvider): Promise<ScheduledLoop>
   // Checkpoint 3 — the "date>" query convention).
   const cursors = await loadProviderCursors(provider.id);
 
-  return scheduleLoop(async () => {
+  const pollingLoop = scheduleLoop(async () => {
     try {
       const sessions = await prisma.session.findMany({
         where: { fixture: { sport: { slug: provider.sportId } } },
@@ -73,6 +72,27 @@ export async function runF1Job(provider: SportsProvider): Promise<ScheduledLoop>
       );
     }
   }, config.f1PollIntervalMs);
+
+  // Calendar rows are provider snapshots. Refresh them independently from
+  // live polling so schedule changes and provider lifecycle updates arrive
+  // without requiring a worker restart. The API still derives lifecycle
+  // from timestamps as a defensive fallback between refreshes.
+  const calendarLoop = scheduleLoop(async () => {
+    try {
+      await bootstrapF1Calendar(provider, { seasonLabels: config.f1BootstrapSeasons });
+    } catch (error) {
+      logger.error(
+        { error: error instanceof Error ? error.message : String(error) },
+        "F1 calendar reconciliation failed",
+      );
+    }
+  }, config.f1CalendarRefreshIntervalMs);
+
+  return {
+    async stop() {
+      await Promise.all([pollingLoop.stop(), calendarLoop.stop()]);
+    },
+  };
 }
 
 /**

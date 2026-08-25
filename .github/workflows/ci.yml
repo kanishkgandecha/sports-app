@@ -36,7 +36,6 @@ jobs:
       CORS_ORIGINS: http://localhost:3000
       F1_PROVIDER: disabled
       F1_STANDINGS_PROVIDER: disabled
-      CRICKET_PROVIDER: disabled
       NEXT_PUBLIC_API_URL: http://localhost:4000
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +51,8 @@ jobs:
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm exec turbo run test --force
+      - run: pnpm test:unit --force
+      - run: pnpm test:integration
       - run: pnpm exec turbo run build --force
       - run: pnpm audit --prod --audit-level high
 

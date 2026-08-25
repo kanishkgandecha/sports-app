@@ -14,6 +14,7 @@ export const config = {
   f1PollIntervalMs: readPositiveInteger("F1_POLL_INTERVAL_MS", 15_000),
   f1MaxSessionDurationMs: readPositiveInteger("F1_MAX_SESSION_DURATION_MS", 4 * 60 * 60 * 1000),
   f1BootstrapRequestDelayMs: readPositiveInteger("F1_BOOTSTRAP_REQUEST_DELAY_MS", 400),
+  f1CalendarRefreshIntervalMs: readPositiveInteger("F1_CALENDAR_REFRESH_INTERVAL_MS", 6 * 60 * 60 * 1000),
   f1BootstrapSeasons: (process.env.F1_BOOTSTRAP_SEASONS ?? String(new Date().getFullYear()))
     .split(",")
     .map((season) => season.trim())
