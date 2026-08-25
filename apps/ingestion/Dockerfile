@@ -6,7 +6,7 @@
 # migrate-deploy-on-start decision). Not repeated verbatim here; only the
 # genuine differences are called out below.
 
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 RUN corepack enable
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -35,7 +35,7 @@ COPY tsconfig.base.json ./tsconfig.base.json
 RUN turbo run build --filter=@sports/ingestion...
 
 # ---- runtime ------------------------------------------------------------------
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 RUN addgroup -S sports && adduser -S sports -G sports
 WORKDIR /repo
 COPY --from=builder /repo .
