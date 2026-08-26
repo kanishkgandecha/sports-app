@@ -64,6 +64,12 @@ export interface OpenF1HistoricalSessionDetail {
   stints: f1.TyreStint[];
 }
 
+export interface OpenF1HistoricalSessionAnalysis {
+  classifications: f1.SessionClassification[];
+  laps: f1.Lap[];
+  stints: f1.TyreStint[];
+}
+
 /**
  * OpenF1-backed `SportsProvider` (Checkpoint 3 — see docs/CONTEXT.md §8;
  * `getVenues` added to the shared interface at Checkpoint 4 §9, resolving a
@@ -201,6 +207,29 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
       players,
       events,
       timingPatches: [...patches.values()],
+      classifications: results.map((result) => normalizeSessionClassification(result, sessionId)),
+      laps: laps.map((lap) => normalizeLapRecord(lap, sessionId)),
+      stints: stints.map((stint) => normalizeTyreStint(stint, sessionId)),
+    };
+  }
+
+  /**
+   * Focused historical-analysis snapshot. The rolling Phase 2 backfill does
+   * not need to re-download drivers, race control, or pit events already
+   * persisted by the detail importer, so this deliberately reads only the
+   * three normalized analysis sources.
+   */
+  async getHistoricalSessionAnalysis(sessionId: string): Promise<OpenF1HistoricalSessionAnalysis> {
+    const sessionKey = sessionKeyFromSessionId(sessionId);
+    const [results, laps, stints] = await this.timed("getHistoricalSessionAnalysis", () =>
+      Promise.all([
+        this.client.get<OpenF1SessionResult>("/session_result", { session_key: sessionKey }),
+        this.client.get<OpenF1Lap>("/laps", { session_key: sessionKey }),
+        this.client.get<OpenF1Stint>("/stints", { session_key: sessionKey }),
+      ]),
+    );
+
+    return {
       classifications: results.map((result) => normalizeSessionClassification(result, sessionId)),
       laps: laps.map((lap) => normalizeLapRecord(lap, sessionId)),
       stints: stints.map((stint) => normalizeTyreStint(stint, sessionId)),
