@@ -9,6 +9,7 @@ import type {
   Standing,
   Team,
   Venue,
+  f1,
 } from "@sports/domain";
 import { BaseProviderAdapter, type RequestLogger, type SportsProvider } from "@sports/providers-core";
 import { OpenF1FetchClient, type OpenF1HttpClient } from "./client";
@@ -30,8 +31,11 @@ import {
   intervalTimingPatch,
   lapTimingPatch,
   normalizeLap,
+  normalizeLapRecord,
   normalizePitStop,
+  normalizeSessionClassification,
   normalizeStint,
+  normalizeTyreStint,
   positionTimingPatch,
   sessionResultTimingPatch,
 } from "./normalize/timing";
@@ -55,6 +59,9 @@ export interface OpenF1HistoricalSessionDetail {
   players: Player[];
   events: LiveEvent[];
   timingPatches: DriverTimingPatch[];
+  classifications: f1.SessionClassification[];
+  laps: f1.Lap[];
+  stints: f1.TyreStint[];
 }
 
 /**
@@ -189,7 +196,15 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
     }
     finalStints.forEach((stint) => merge(normalizeStint(stint, sessionId)));
 
-    return { teams, players, events, timingPatches: [...patches.values()] };
+    return {
+      teams,
+      players,
+      events,
+      timingPatches: [...patches.values()],
+      classifications: results.map((result) => normalizeSessionClassification(result, sessionId)),
+      laps: laps.map((lap) => normalizeLapRecord(lap, sessionId)),
+      stints: stints.map((stint) => normalizeTyreStint(stint, sessionId)),
+    };
   }
 
   /**

@@ -6,8 +6,11 @@ import {
   intervalTimingPatch,
   lapTimingPatch,
   normalizeLap,
+  normalizeLapRecord,
   normalizePitStop,
+  normalizeSessionClassification,
   normalizeStint,
+  normalizeTyreStint,
   sessionResultTimingPatch,
 } from "./timing";
 import lapFixture from "../fixtures/laps.sample.json";
@@ -128,6 +131,60 @@ describe("sessionResultTimingPatch", () => {
       gap_to_leader: [2.534, null, null],
     };
     expect(sessionResultTimingPatch(result, "f1-session-11344").gapToLeader).toBe("+2.534");
+  });
+});
+
+describe("Phase 2 analysis normalization", () => {
+  const result: OpenF1SessionResult = {
+    session_key: 11344,
+    meeting_key: 1292,
+    driver_number: 11,
+    position: 21,
+    number_of_laps: 7,
+    points: null,
+    dnf: false,
+    dns: false,
+    dsq: false,
+    duration: [75.545, null, null],
+    gap_to_leader: [2.534, null, null],
+  };
+
+  it("preserves qualifying phases and null eliminations in the classification", () => {
+    expect(normalizeSessionClassification(result, "f1-session-11344")).toMatchObject({
+      id: "openf1-result-11344-11",
+      driverId: "f1-driver-11",
+      position: 21,
+      status: "classified",
+      lapsCompleted: 7,
+      durationSeconds: null,
+      phase1Duration: 75.545,
+      phase2Duration: null,
+      phase3Duration: null,
+      phase1Gap: "+2.534",
+      gapToLeader: "+2.534",
+    });
+  });
+
+  it("preserves every lap timing and speed field, including null duration", () => {
+    expect(normalizeLapRecord({ ...realLap, lap_duration: null }, "f1-session-9574")).toMatchObject({
+      driverId: "f1-driver-1",
+      lapNumber: realLap.lap_number,
+      duration: null,
+      sector1: realLap.duration_sector_1,
+      speedTrap: realLap.st_speed,
+      isPitOutLap: realLap.is_pit_out_lap,
+    });
+  });
+
+  it("preserves stint boundaries, compound, and tyre age", () => {
+    expect(normalizeTyreStint(realStint, "f1-session-9574")).toMatchObject({
+      driverId: `f1-driver-${realStint.driver_number}`,
+      stintNumber: realStint.stint_number,
+      lapStart: realStint.lap_start,
+      lapEnd: realStint.lap_end,
+      compound: realStint.compound,
+      tyreAgeAtStart: realStint.tyre_age_at_start,
+    });
   });
 });
 

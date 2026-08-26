@@ -133,6 +133,89 @@ export async function f1Routes(app: FastifyInstance) {
     };
   });
 
+  app.get<{ Params: { sessionId: string } }>("/api/f1/sessions/:sessionId/results", async (req, reply) => {
+    const session = await prisma.session.findUnique({ where: { id: req.params.sessionId } });
+    if (!session) return reply.code(404).send({ error: `No session "${req.params.sessionId}"` });
+
+    const rows = await prisma.sessionClassification.findMany({ where: { sessionId: req.params.sessionId } });
+    rows.sort((a, b) => (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER));
+    const drivers = await driversById(rows.map((row) => row.driverId));
+    return {
+      results: rows.map((row) => ({
+        position: row.position,
+        driver: drivers.get(row.driverId) ?? unknownDriver(row.driverId),
+        status: row.status,
+        lapsCompleted: row.lapsCompleted,
+        points: row.points,
+        durationSeconds: row.durationSeconds,
+        gapToLeader: row.gapToLeader,
+        phases: [
+          { duration: row.phase1Duration, gap: row.phase1Gap },
+          { duration: row.phase2Duration, gap: row.phase2Gap },
+          { duration: row.phase3Duration, gap: row.phase3Gap },
+        ],
+      })),
+    };
+  });
+
+  app.get<{ Params: { sessionId: string }; Querystring: { driverId?: string; limit?: string } }>(
+    "/api/f1/sessions/:sessionId/laps",
+    async (req, reply) => {
+      const session = await prisma.session.findUnique({ where: { id: req.params.sessionId } });
+      if (!session) return reply.code(404).send({ error: `No session "${req.params.sessionId}"` });
+      const limit = req.query.limit === undefined ? 2_000 : Number(req.query.limit);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 2_000)
+        return reply.code(400).send({ error: "limit must be from 1 to 2000" });
+
+      const rows = await prisma.lap.findMany({
+        where: { sessionId: req.params.sessionId, ...(req.query.driverId ? { driverId: req.query.driverId } : {}) },
+        orderBy: [{ driverId: "asc" }, { lapNumber: "asc" }],
+        take: limit + 1,
+      });
+      const pageRows = rows.slice(0, limit);
+      const drivers = await driversById(pageRows.map((row) => row.driverId));
+      return {
+        laps: pageRows.map((row) => ({
+          id: row.id,
+          driver: drivers.get(row.driverId) ?? unknownDriver(row.driverId),
+          lapNumber: row.lapNumber,
+          startedAt: row.startedAt?.toISOString() ?? null,
+          duration: row.duration,
+          sector1: row.sector1,
+          sector2: row.sector2,
+          sector3: row.sector3,
+          speedI1: row.speedI1,
+          speedI2: row.speedI2,
+          speedTrap: row.speedTrap,
+          isPitOutLap: row.isPitOutLap,
+        })),
+        truncated: rows.length > limit,
+      };
+    },
+  );
+
+  app.get<{ Params: { sessionId: string } }>("/api/f1/sessions/:sessionId/stints", async (req, reply) => {
+    const session = await prisma.session.findUnique({ where: { id: req.params.sessionId } });
+    if (!session) return reply.code(404).send({ error: `No session "${req.params.sessionId}"` });
+
+    const rows = await prisma.tyreStint.findMany({
+      where: { sessionId: req.params.sessionId },
+      orderBy: [{ driverId: "asc" }, { stintNumber: "asc" }],
+    });
+    const drivers = await driversById(rows.map((row) => row.driverId));
+    return {
+      stints: rows.map((row) => ({
+        id: row.id,
+        driver: drivers.get(row.driverId) ?? unknownDriver(row.driverId),
+        stintNumber: row.stintNumber,
+        lapStart: row.lapStart,
+        lapEnd: row.lapEnd,
+        compound: row.compound,
+        tyreAgeAtStart: row.tyreAgeAtStart,
+      })),
+    };
+  });
+
   app.get<{ Params: { sessionId: string } }>("/api/f1/sessions/:sessionId/race-control", async (req, reply) => {
     const session = await prisma.session.findUnique({ where: { id: req.params.sessionId } });
     if (!session) {

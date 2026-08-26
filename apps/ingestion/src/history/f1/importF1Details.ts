@@ -17,6 +17,7 @@ export interface F1DetailImportOptions {
   sessionTypes?: string[] | "ALL";
   retryUnavailable?: boolean;
   retryFailed?: boolean;
+  refreshAnalysis?: boolean;
   dryRun?: boolean;
   now?: Date;
 }
@@ -122,7 +123,7 @@ export async function importF1Details(provider: F1DetailProvider, options: F1Det
       continue;
     }
     if (
-      session.dataProfile?.status === "available" ||
+      (session.dataProfile?.status === "available" && !options.refreshAnalysis) ||
       (session.dataProfile?.status === "failed" &&
         !options.retryFailed &&
         session.dataProfile.nextRetryAt &&
@@ -134,7 +135,7 @@ export async function importF1Details(provider: F1DetailProvider, options: F1Det
     const cursor = await prisma.providerCursor.findUnique({
       where: { providerId_sessionId: { providerId: CURSOR_PROVIDER, sessionId: session.id } },
     });
-    if (cursor?.cursor === "complete") {
+    if (cursor?.cursor === "complete" && !options.refreshAnalysis) {
       await markSessionAvailable(session.id, now);
       skipped += 1;
       continue;
@@ -159,7 +160,13 @@ export async function importF1Details(provider: F1DetailProvider, options: F1Det
         },
       });
       const detail = await provider.getHistoricalSessionDetail(session.id);
-      if (detail.timingPatches.length === 0 && detail.events.length === 0) {
+      if (
+        detail.timingPatches.length === 0 &&
+        detail.events.length === 0 &&
+        detail.classifications.length === 0 &&
+        detail.laps.length === 0 &&
+        detail.stints.length === 0
+      ) {
         await prisma.sessionDataProfile.update({
           where: { sessionId: session.id },
           data: {
@@ -253,6 +260,16 @@ async function persistSessionDetail(
         skipDuplicates: true,
       });
       for (const patch of detail.timingPatches) await upsertTiming(tx, patch);
+      await tx.sessionClassification.deleteMany({ where: { sessionId } });
+      await tx.lap.deleteMany({ where: { sessionId } });
+      await tx.tyreStint.deleteMany({ where: { sessionId } });
+      await tx.sessionClassification.createMany({ data: detail.classifications });
+      for (const laps of chunks(detail.laps, 1_000)) {
+        await tx.lap.createMany({
+          data: laps.map((lap) => ({ ...lap, startedAt: lap.startedAt ? new Date(lap.startedAt) : null })),
+        });
+      }
+      await tx.tyreStint.createMany({ data: detail.stints });
       await tx.sessionDataProfile.update({
         where: { sessionId },
         data: { status: "available", reason: null, nextRetryAt: null, importedAt: new Date() },

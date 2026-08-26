@@ -13,7 +13,7 @@ const requestedWindow = args.get("--years");
 const limit = Number(args.get("--limit") ?? 30);
 if ((requestedYear === undefined) === (requestedWindow === undefined)) {
   throw new Error(
-    "Usage: pnpm history:f1:details (--year=YYYY | --years=3) [--limit=30] [--fixture=id] [--session-types=RACE|ALL] [--retry-failed] [--retry-unavailable] [--dry-run]",
+    "Usage: pnpm history:f1:details (--year=YYYY | --years=3) [--limit=30] [--fixture=id] [--session-types=RACE|ALL] [--retry-failed] [--retry-unavailable] [--refresh-analysis] [--dry-run]",
   );
 }
 const years = requestedYear ? [Number(requestedYear)] : rollingSeasonYears(Number(requestedWindow));
@@ -36,6 +36,7 @@ for (const year of years) {
       sessionTypes,
       retryUnavailable: args.has("--retry-unavailable"),
       retryFailed: args.has("--retry-failed"),
+      refreshAnalysis: args.has("--refresh-analysis"),
       dryRun: args.has("--dry-run"),
     }),
   );

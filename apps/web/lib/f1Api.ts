@@ -83,6 +83,42 @@ export interface F1PitStop {
   timestamp: string;
 }
 
+export interface F1SessionResult {
+  position: number | null;
+  driver: F1DriverRef;
+  status: "classified" | "dnf" | "dns" | "dsq";
+  lapsCompleted: number;
+  points: number | null;
+  durationSeconds: number | null;
+  gapToLeader: string | null;
+  phases: Array<{ duration: number | null; gap: string | null }>;
+}
+
+export interface F1Lap {
+  id: string;
+  driver: F1DriverRef;
+  lapNumber: number;
+  startedAt: string | null;
+  duration: number | null;
+  sector1: number | null;
+  sector2: number | null;
+  sector3: number | null;
+  speedI1: number | null;
+  speedI2: number | null;
+  speedTrap: number | null;
+  isPitOutLap: boolean;
+}
+
+export interface F1TyreStint {
+  id: string;
+  driver: F1DriverRef;
+  stintNumber: number;
+  lapStart: number;
+  lapEnd: number | null;
+  compound: string | null;
+  tyreAgeAtStart: number | null;
+}
+
 /**
  * Checkpoint 6 — championship standings, sourced from
  * `GET /api/f1/seasons/:year/standings/*` (apps/api/src/routes/f1.ts).
@@ -138,6 +174,21 @@ export function getF1RaceControl(sessionId: string) {
 
 export function getF1PitStops(sessionId: string) {
   return apiGet<{ pitStops: F1PitStop[]; freshness: F1Freshness }>(`/api/f1/sessions/${sessionId}/pit-stops`);
+}
+
+export function getF1Results(sessionId: string) {
+  return apiGet<{ results: F1SessionResult[] }>(`/api/f1/sessions/${sessionId}/results`);
+}
+
+export function getF1Laps(sessionId: string, driverId?: string) {
+  const query = new URLSearchParams();
+  if (driverId) query.set("driverId", driverId);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return apiGet<{ laps: F1Lap[]; truncated: boolean }>(`/api/f1/sessions/${sessionId}/laps${suffix}`);
+}
+
+export function getF1Stints(sessionId: string) {
+  return apiGet<{ stints: F1TyreStint[] }>(`/api/f1/sessions/${sessionId}/stints`);
 }
 
 export function getF1DriverStandings(year: number) {

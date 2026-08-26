@@ -48,6 +48,53 @@ export interface RaceControlMessage {
   message: string;
 }
 
+export type SessionClassificationStatus = "classified" | "dnf" | "dns" | "dsq";
+
+export interface SessionClassification {
+  id: string;
+  sessionId: string;
+  driverId: string;
+  position: number | null;
+  status: SessionClassificationStatus;
+  lapsCompleted: number;
+  points: number | null;
+  durationSeconds: number | null;
+  gapToLeader: string | null;
+  phase1Duration: number | null;
+  phase2Duration: number | null;
+  phase3Duration: number | null;
+  phase1Gap: string | null;
+  phase2Gap: string | null;
+  phase3Gap: string | null;
+}
+
+export interface Lap {
+  id: string;
+  sessionId: string;
+  driverId: string;
+  lapNumber: number;
+  startedAt: string | null;
+  duration: number | null;
+  sector1: number | null;
+  sector2: number | null;
+  sector3: number | null;
+  speedI1: number | null;
+  speedI2: number | null;
+  speedTrap: number | null;
+  isPitOutLap: boolean;
+}
+
+export interface TyreStint {
+  id: string;
+  sessionId: string;
+  driverId: string;
+  stintNumber: number;
+  lapStart: number;
+  lapEnd: number | null;
+  compound: TyreCompound | null;
+  tyreAgeAtStart: number | null;
+}
+
 /**
  * F1 LiveEvent payloads (ARCHITECTURE.md §5 / master brief §11).
  * Each variant is a LiveEvent<T>["payload"] for a given eventType.

@@ -109,6 +109,66 @@ export function sessionResultTimingPatch(result: OpenF1SessionResult, sessionId:
   };
 }
 
+export function normalizeSessionClassification(
+  result: OpenF1SessionResult,
+  sessionId: string,
+): f1.SessionClassification {
+  const durations = Array.isArray(result.duration) ? result.duration : [];
+  const gaps = Array.isArray(result.gap_to_leader) ? result.gap_to_leader : [];
+  return {
+    id: `openf1-result-${result.session_key}-${result.driver_number}`,
+    sessionId,
+    driverId: buildDriverId(result.driver_number),
+    position: result.position,
+    status: result.dsq ? "dsq" : result.dns ? "dns" : result.dnf ? "dnf" : "classified",
+    lapsCompleted: result.number_of_laps,
+    points: result.points ?? null,
+    durationSeconds: Array.isArray(result.duration) ? null : result.duration,
+    gapToLeader: Array.isArray(result.gap_to_leader) ? formatGap(lastNonNull(gaps)) : formatGap(result.gap_to_leader),
+    phase1Duration: durations[0] ?? null,
+    phase2Duration: durations[1] ?? null,
+    phase3Duration: durations[2] ?? null,
+    phase1Gap: formatGap(gaps[0] ?? null),
+    phase2Gap: formatGap(gaps[1] ?? null),
+    phase3Gap: formatGap(gaps[2] ?? null),
+  };
+}
+
+export function normalizeLapRecord(lap: OpenF1Lap, sessionId: string): f1.Lap {
+  return {
+    id: `openf1-lap-record-${lap.session_key}-${lap.driver_number}-${lap.lap_number}`,
+    sessionId,
+    driverId: buildDriverId(lap.driver_number),
+    lapNumber: lap.lap_number,
+    startedAt: lap.date_start,
+    duration: lap.lap_duration,
+    sector1: lap.duration_sector_1,
+    sector2: lap.duration_sector_2,
+    sector3: lap.duration_sector_3,
+    speedI1: lap.i1_speed,
+    speedI2: lap.i2_speed,
+    speedTrap: lap.st_speed,
+    isPitOutLap: lap.is_pit_out_lap,
+  };
+}
+
+export function normalizeTyreStint(stint: OpenF1Stint, sessionId: string): f1.TyreStint {
+  return {
+    id: `openf1-stint-${stint.session_key}-${stint.driver_number}-${stint.stint_number}`,
+    sessionId,
+    driverId: buildDriverId(stint.driver_number),
+    stintNumber: stint.stint_number,
+    lapStart: stint.lap_start,
+    lapEnd: stint.lap_end,
+    compound: stint.compound ? (stint.compound as f1.TyreCompound) : null,
+    tyreAgeAtStart: stint.tyre_age_at_start ?? null,
+  };
+}
+
+function lastNonNull<T>(values: Array<T | null>): T | null {
+  return [...values].reverse().find((value): value is T => value !== null) ?? null;
+}
+
 export function intervalTimingPatch(interval: OpenF1Interval, sessionId: string): DriverTimingPatch {
   return {
     sessionId,

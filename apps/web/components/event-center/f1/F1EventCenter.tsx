@@ -20,6 +20,7 @@ import { TimingTower } from "./TimingTower";
 import { RaceControlFeed } from "./RaceControlFeed";
 import { PitStopList } from "./PitStopList";
 import { StandingsPanel } from "./StandingsPanel";
+import { SessionAnalysis } from "./SessionAnalysis";
 import styles from "./f1EventCenter.module.css";
 
 interface ListState<T> {
@@ -216,6 +217,10 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
             </section>
           </div>
         </div>
+      )}
+
+      {activeSession.lifecycle === "completed" && activeSession.detailAvailable && (
+        <SessionAnalysis sessionId={activeSession.id} sessionType={activeSession.type} />
       )}
 
       {/* Season-scoped, not session-scoped — see StandingsPanel's doc

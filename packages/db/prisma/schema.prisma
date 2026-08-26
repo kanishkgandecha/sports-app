@@ -179,8 +179,8 @@ model Session {
   startTime DateTime
   endTime   DateTime?
 
-  fixture    Fixture     @relation(fields: [fixtureId], references: [id])
-  liveEvents LiveEvent[]
+  fixture     Fixture             @relation(fields: [fixtureId], references: [id])
+  liveEvents  LiveEvent[]
   dataProfile SessionDataProfile?
 
   @@index([fixtureId])
@@ -321,4 +321,67 @@ model RaceControlMessage {
   message   String
 
   @@index([sessionId, timestamp])
+}
+
+/// Final driver classification for one completed session. `durationSeconds`
+/// follows OpenF1's session semantics: best time for practice, total elapsed
+/// time for a race. Qualifying phase values are stored separately so null Q2/
+/// Q3 eliminations remain truthful rather than collapsing an array.
+model SessionClassification {
+  id              String  @id
+  sessionId       String
+  driverId        String
+  position        Int?
+  status          String // "classified" | "dnf" | "dns" | "dsq"
+  lapsCompleted   Int
+  points          Float?
+  durationSeconds Float?
+  gapToLeader     String?
+  phase1Duration  Float?
+  phase2Duration  Float?
+  phase3Duration  Float?
+  phase1Gap       String?
+  phase2Gap       String?
+  phase3Gap       String?
+
+  @@unique([sessionId, driverId])
+  @@index([sessionId, position])
+}
+
+/// One normalized OpenF1 lap. Null timing fields represent a real upstream
+/// omission (commonly pit-out/in-progress laps), never a fabricated zero.
+model Lap {
+  id          String    @id
+  sessionId   String
+  driverId    String
+  lapNumber   Int
+  startedAt   DateTime?
+  duration    Float?
+  sector1     Float?
+  sector2     Float?
+  sector3     Float?
+  speedI1     Int?
+  speedI2     Int?
+  speedTrap   Int?
+  isPitOutLap Boolean   @default(false)
+
+  @@unique([sessionId, driverId, lapNumber])
+  @@index([sessionId, driverId, lapNumber])
+  @@index([sessionId, duration])
+}
+
+/// A driver's tyre run within a session. `lapEnd` remains nullable when the
+/// provider has not supplied an end boundary.
+model TyreStint {
+  id             String  @id
+  sessionId      String
+  driverId       String
+  stintNumber    Int
+  lapStart       Int
+  lapEnd         Int?
+  compound       String?
+  tyreAgeAtStart Int?
+
+  @@unique([sessionId, driverId, stintNumber])
+  @@index([sessionId, driverId, stintNumber])
 }

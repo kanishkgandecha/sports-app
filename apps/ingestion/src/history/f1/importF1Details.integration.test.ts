@@ -56,6 +56,54 @@ function detail(): OpenF1HistoricalSessionDetail {
         state: "running",
       },
     ],
+    classifications: [
+      {
+        id: "f1-detail-test-result",
+        sessionId: SESSION_ID,
+        driverId: PLAYER_ID,
+        position: 1,
+        status: "classified",
+        lapsCompleted: 1,
+        points: 25,
+        durationSeconds: 90,
+        gapToLeader: "0.000",
+        phase1Duration: null,
+        phase2Duration: null,
+        phase3Duration: null,
+        phase1Gap: null,
+        phase2Gap: null,
+        phase3Gap: null,
+      },
+    ],
+    laps: [
+      {
+        id: "f1-detail-test-lap",
+        sessionId: SESSION_ID,
+        driverId: PLAYER_ID,
+        lapNumber: 1,
+        startedAt: "2024-01-01T01:00:00.000Z",
+        duration: 90,
+        sector1: 30,
+        sector2: 30,
+        sector3: 30,
+        speedI1: 250,
+        speedI2: 270,
+        speedTrap: 300,
+        isPitOutLap: false,
+      },
+    ],
+    stints: [
+      {
+        id: "f1-detail-test-stint",
+        sessionId: SESSION_ID,
+        driverId: PLAYER_ID,
+        stintNumber: 1,
+        lapStart: 1,
+        lapEnd: 1,
+        compound: "SOFT",
+        tyreAgeAtStart: 0,
+      },
+    ],
   };
 }
 
@@ -63,6 +111,9 @@ async function cleanup() {
   await prisma.historicalImport.deleteMany({ where: { source: "openf1-detail", scopeKey: { contains: FIXTURE_ID } } });
   await prisma.providerCursor.deleteMany({ where: { providerId: "openf1-history-detail-v1", sessionId: SESSION_ID } });
   await prisma.liveEvent.deleteMany({ where: { id: EVENT_ID } });
+  await prisma.sessionClassification.deleteMany({ where: { sessionId: SESSION_ID } });
+  await prisma.lap.deleteMany({ where: { sessionId: SESSION_ID } });
+  await prisma.tyreStint.deleteMany({ where: { sessionId: SESSION_ID } });
   await prisma.driverTiming.deleteMany({ where: { sessionId: SESSION_ID } });
   await prisma.session.deleteMany({ where: { id: SESSION_ID } });
   await prisma.fixture.deleteMany({ where: { id: FIXTURE_ID } });
@@ -170,6 +221,9 @@ describe("F1 historical detail persistence (real Postgres)", () => {
     expect(notifications.filter((payload) => JSON.parse(payload).id === EVENT_ID)).toHaveLength(0);
     await expect(prisma.driverTiming.count({ where: { sessionId: SESSION_ID } })).resolves.toBe(1);
     await expect(prisma.liveEvent.count({ where: { id: EVENT_ID } })).resolves.toBe(1);
+    await expect(prisma.sessionClassification.count({ where: { sessionId: SESSION_ID } })).resolves.toBe(1);
+    await expect(prisma.lap.count({ where: { sessionId: SESSION_ID } })).resolves.toBe(1);
+    await expect(prisma.tyreStint.count({ where: { sessionId: SESSION_ID } })).resolves.toBe(1);
     await expect(
       prisma.fixtureDataProfile.findUniqueOrThrow({ where: { fixtureId: FIXTURE_ID } }),
     ).resolves.toMatchObject({
@@ -185,7 +239,7 @@ describe("F1 historical detail persistence (real Postgres)", () => {
       id: "openf1",
       getHistoricalSessionDetail: async () => {
         calls += 1;
-        return { teams: [], players: [], events: [], timingPatches: [] };
+        return { teams: [], players: [], events: [], timingPatches: [], classifications: [], laps: [], stints: [] };
       },
     };
 
@@ -277,6 +331,9 @@ describe("F1 historical detail persistence (real Postgres)", () => {
 async function resetDetailState() {
   await prisma.providerCursor.deleteMany({ where: { providerId: "openf1-history-detail-v1", sessionId: SESSION_ID } });
   await prisma.liveEvent.deleteMany({ where: { sessionId: SESSION_ID } });
+  await prisma.sessionClassification.deleteMany({ where: { sessionId: SESSION_ID } });
+  await prisma.lap.deleteMany({ where: { sessionId: SESSION_ID } });
+  await prisma.tyreStint.deleteMany({ where: { sessionId: SESSION_ID } });
   await prisma.driverTiming.deleteMany({ where: { sessionId: SESSION_ID } });
   await prisma.sessionDataProfile.deleteMany({ where: { sessionId: SESSION_ID } });
   await prisma.fixtureDataProfile.update({ where: { fixtureId: FIXTURE_ID }, data: { coverage: "summary" } });
