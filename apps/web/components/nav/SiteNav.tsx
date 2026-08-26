@@ -15,25 +15,27 @@ export function SiteNav() {
 
   return (
     <header className={styles.header}>
-      <Link href="/" className={styles.brand}>
-        <span className={styles.brandMark} aria-hidden="true" />
-        <span>F1 Race Center</span>
-      </Link>
-      <nav className={styles.links} aria-label="Formula 1">
-        {NAV_ITEMS.map((item) => {
-          const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={isActive ? "page" : undefined}
-              className={[styles.link, isActive ? styles.linkActive : ""].filter(Boolean).join(" ")}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className={styles.inner}>
+        <Link href="/" className={styles.brand}>
+          <span className={styles.brandMark} aria-hidden="true" />
+          <span>F1 Race Center</span>
+        </Link>
+        <nav className={styles.links} aria-label="Formula 1">
+          {NAV_ITEMS.map((item) => {
+            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? "page" : undefined}
+                className={[styles.link, isActive ? styles.linkActive : ""].filter(Boolean).join(" ")}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
     </header>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveSession } from "../../../lib/hooks/useLiveSession";
 import {
@@ -139,6 +140,11 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
+        <div className={styles.breadcrumb} aria-label="Breadcrumb">
+          <Link href="/archive">Archive</Link>
+          <span aria-hidden="true">/</span>
+          <span>{new Date(fixture.startTime).getFullYear()}</span>
+        </div>
         <div className={styles.headerTop}>
           <div>
             <h1 className={styles.fixtureName}>{fixture.name}</h1>
@@ -152,6 +158,9 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
         </div>
         <div className={styles.statusRow}>
           <span className={styles.sessionLabel}>{activeSession.type.replace(/_/g, " ")}</span>
+          <span className={styles.sessionCount}>
+            {availableSessions.length} {availableSessions.length === 1 ? "session" : "sessions"}
+          </span>
           <FreshnessIndicator state={freshness.state} updatedAt={freshness.updatedAt ?? new Date().toISOString()} />
         </div>
         <SessionSelector

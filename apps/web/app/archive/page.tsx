@@ -12,9 +12,9 @@ export default function ArchivePage({ searchParams }: { searchParams: RawSearchP
   return (
     <Suspense
       fallback={
-        <main className={styles.shell}>
+        <div className={styles.shell}>
           <p className={styles.empty}>Loading archive…</p>
-        </main>
+        </div>
       }
     >
       <ArchiveContent searchParams={searchParams} />
@@ -38,14 +38,21 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
     getArchiveFixtures(filters).catch(() => null),
     getArchiveOptions().catch(() => null),
   ]);
+  const pageCoverage = results?.fixtures.reduce(
+    (counts, fixture) => {
+      counts[fixture.coverage] += 1;
+      return counts;
+    },
+    { summary: 0, partial: 0, "event-data": 0 },
+  );
   return (
-    <main className={`${styles.shell} ${styles.f1}`}>
+    <div className={styles.shell}>
       <header className={styles.hero}>
         <p className={styles.eyebrow}>Formula 1 · database-backed · provider attributed</p>
         <h1>F1 archive</h1>
         <p>Browse every imported F1 weekend, including honest session-by-session historical coverage.</p>
       </header>
-      <form className={styles.filters} method="get">
+      <form className={styles.filters} method="get" aria-label="Filter the F1 archive">
         <label>
           Search
           <input name="q" defaultValue={filters.q} placeholder="Grand Prix or circuit" />
@@ -107,43 +114,57 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
       ) : results.fixtures.length === 0 ? (
         <p className={styles.empty}>No imported races match these filters.</p>
       ) : (
-        <section className={styles.results} aria-label="Formula 1 archive results">
-          {results.fixtures.map((fixture) => {
-            const content = (
-              <>
+        <section aria-labelledby="archive-results-title">
+          <div className={styles.resultsHeader}>
+            <div>
+              <p className={styles.resultsEyebrow}>Archive index</p>
+              <h2 id="archive-results-title">{results.fixtures.length} weekends on this page</h2>
+            </div>
+            {pageCoverage && (
+              <ul className={styles.coverageLegend} aria-label="Coverage on this page">
+                <li data-coverage="event-data">{pageCoverage["event-data"]} event data</li>
+                <li data-coverage="partial">{pageCoverage.partial} partial</li>
+                <li data-coverage="summary">{pageCoverage.summary} summary</li>
+              </ul>
+            )}
+          </div>
+          <div className={styles.results}>
+            {results.fixtures.map((fixture) => (
+              <Link
+                key={fixture.id}
+                href={`/events/${fixture.id}`}
+                className={styles.card}
+                data-coverage={fixture.coverage}
+              >
                 <div className={styles.cardTop}>
                   <span>
                     {fixture.season.label} · {fixture.competition.name}
                   </span>
-                  <span className={styles.coverage}>
-                    {fixture.kind === "testing" ? "testing" : fixture.coverage.replace("-", " ")}
-                  </span>
+                  <span className={styles.coverage}>{coverageLabel(fixture)}</span>
                 </div>
-                <h2>{fixture.name}</h2>
+                <h3>{fixture.name}</h3>
                 <p className={styles.meta}>
                   {formatDate(fixture.startTime)}
                   {venueLine(fixture.venue) && ` · ${venueLine(fixture.venue)}`}
                 </p>
                 <div className={styles.cardBottom}>
                   <span>{fixture.source?.provider ?? "Imported F1 record"}</span>
-                  <span>
+                  <span className={styles.cardAction}>
                     {fixture.sessionCoverage.available > 0
-                      ? `${fixture.sessionCoverage.available}/${fixture.sessionCoverage.total} sessions available →`
+                      ? `${fixture.sessionCoverage.available}/${fixture.sessionCoverage.total} sessions available`
                       : fixture.sessionCoverage.unavailable > 0
-                        ? "Provider has no session detail →"
+                        ? "Provider has no session detail"
                         : fixture.sessionCoverage.failed > 0
-                          ? "Import retry scheduled →"
-                          : "Summary available →"}
+                          ? "Import retry scheduled"
+                          : fixture.status === "scheduled"
+                            ? "Weekend scheduled"
+                            : "Summary available"}
+                    <span aria-hidden="true">→</span>
                   </span>
                 </div>
-              </>
-            );
-            return (
-              <Link key={fixture.id} href={`/events/${fixture.id}`} className={styles.card}>
-                {content}
               </Link>
-            );
-          })}
+            ))}
+          </div>
         </section>
       )}
       {results?.pageInfo.nextCursor && (
@@ -153,8 +174,16 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
           </Link>
         </div>
       )}
-    </main>
+    </div>
   );
+}
+
+function coverageLabel(fixture: Awaited<ReturnType<typeof getArchiveFixtures>>["fixtures"][number]) {
+  if (fixture.kind === "testing") return "Testing";
+  if (fixture.status === "scheduled") return "Scheduled";
+  if (fixture.coverage === "event-data") return "Event data";
+  if (fixture.coverage === "partial") return "Partial data";
+  return "Summary only";
 }
 
 function scalar(value: string | string[] | undefined) {

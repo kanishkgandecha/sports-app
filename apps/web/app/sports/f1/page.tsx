@@ -90,7 +90,14 @@ export default async function F1LandingPage() {
     <>
       <section className={styles.hero}>
         <div className={styles.heroInner}>
-          <span className={styles.kicker}>Formula 1 · {year} season</span>
+          <div className={styles.heroTopline}>
+            <span className={styles.kicker}>Formula 1 · {year} season</span>
+            {featuredFixture && (
+              <span className={styles.statusPill} data-status={featuredFixture.status}>
+                {fixtureStatusLabel(featuredFixture.status)}
+              </span>
+            )}
+          </div>
           {featuredFixture ? (
             <>
               <h1 className={styles.title}>{featuredFixture.name}</h1>
@@ -104,7 +111,7 @@ export default async function F1LandingPage() {
                   </div>
                 )}
                 {featuredFixture.venue && (
-                  <span style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
+                  <span className={styles.heroVenue}>
                     {featuredFixture.venue.name}, {featuredFixture.venue.country}
                   </span>
                 )}
@@ -116,7 +123,7 @@ export default async function F1LandingPage() {
           ) : (
             <>
               <h1 className={styles.title}>Formula 1</h1>
-              <p style={{ color: "var(--color-text-faint)" }}>
+              <p className={styles.emptyCopy}>
                 {fixtureResult.unavailable
                   ? "The F1 calendar is temporarily unavailable. Please try again shortly."
                   : "No F1 calendar has been imported yet."}
@@ -150,13 +157,9 @@ export default async function F1LandingPage() {
         {(driverStandingsResult.status === "rejected" || constructorStandingsResult.status === "rejected") &&
         driverStandings.length === 0 &&
         constructorStandings.length === 0 ? (
-          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
-            Championship standings are temporarily unavailable.
-          </p>
+          <p className={styles.emptyCopy}>Championship standings are temporarily unavailable.</p>
         ) : driverStandings.length === 0 && constructorStandings.length === 0 ? (
-          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
-            No championship standings have been imported yet.
-          </p>
+          <p className={styles.emptyCopy}>No championship standings have been imported yet.</p>
         ) : (
           <div className={styles.standingsGrid}>
             <div className={styles.standingsCard}>
@@ -201,9 +204,7 @@ export default async function F1LandingPage() {
           </Link>
         </div>
         {completed.length === 0 ? (
-          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
-            No completed sessions yet.
-          </p>
+          <p className={styles.emptyCopy}>No completed sessions yet.</p>
         ) : (
           <FixtureList fixtures={completed.slice(0, 5)} />
         )}
@@ -214,7 +215,7 @@ export default async function F1LandingPage() {
           <h2 className={styles.sectionTitle}>Upcoming calendar</h2>
         </div>
         {upcoming.length === 0 ? (
-          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>No upcoming races loaded.</p>
+          <p className={styles.emptyCopy}>No upcoming races loaded.</p>
         ) : (
           <FixtureList fixtures={upcoming.slice(0, 8)} />
         )}
@@ -234,6 +235,12 @@ export default async function F1LandingPage() {
       </section>
     </>
   );
+}
+
+function fixtureStatusLabel(status: string) {
+  if (status === "live") return "Live weekend";
+  if (status === "scheduled") return "Up next";
+  return "Latest result";
 }
 
 function FixtureList({ fixtures }: { fixtures: F1Fixture[] }) {

@@ -16,11 +16,40 @@
 /* ---- header --------------------------------------------------------- */
 
 .header {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: radial-gradient(60% 130% at 100% 0%, var(--color-accent-soft), transparent 70%), var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-faint);
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.breadcrumb a {
+  color: var(--color-accent-strong);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--duration-fast) var(--ease-standard);
+}
+
+.breadcrumb a:hover {
+  text-decoration-color: currentColor;
 }
 
 .headerTop {
@@ -57,6 +86,11 @@
   color: var(--color-text-faint);
 }
 
+.sessionCount {
+  color: var(--color-text-faint);
+  font-size: var(--font-size-xs);
+}
+
 /* ---- session selector ------------------------------------------------ */
 
 .sessionTabs {
@@ -79,6 +113,7 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
   cursor: pointer;
+  min-height: var(--control-compact-min-height);
   transition:
     background var(--duration-fast) var(--ease-standard),
     color var(--duration-fast) var(--ease-standard),
@@ -266,19 +301,19 @@
    negative stay untouched). This is what "sport-specific visual identity
    in the skin layer" (design principle §15) means concretely. */
 .tyreSoft {
-  color: #e10600;
+  color: var(--tyre-soft);
 }
 .tyreMedium {
-  color: #ffb800;
+  color: var(--tyre-medium);
 }
 .tyreHard {
-  color: var(--color-text);
+  color: var(--tyre-hard);
 }
 .tyreIntermediate {
-  color: #2f9e44;
+  color: var(--tyre-intermediate);
 }
 .tyreWet {
-  color: #1c7ed6;
+  color: var(--tyre-wet);
 }
 
 /* Position-change flash — respects prefers-reduced-motion via the token
@@ -332,6 +367,7 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
   cursor: pointer;
+  min-height: var(--control-compact-min-height);
   transition:
     background var(--duration-fast) var(--ease-standard),
     color var(--duration-fast) var(--ease-standard),
@@ -450,6 +486,10 @@
 /* ---- responsive: mobile ---------------------------------------------------- */
 
 @media (max-width: 640px) {
+  .header {
+    padding: var(--space-4);
+  }
+
   .fixtureName {
     font-size: var(--font-size-xl);
   }
@@ -469,7 +509,7 @@
      pointer doesn't need this). */
   .sessionTab,
   .standingsToggleButton {
-    min-height: 44px;
+    min-height: var(--control-min-height);
     display: inline-flex;
     align-items: center;
   }

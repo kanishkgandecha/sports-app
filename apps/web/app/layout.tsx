@@ -12,8 +12,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={displayFont.variable}>
       <body>
+        <a className="skip-link" href="#main-content">
+          Skip to main content
+        </a>
         <SiteNav />
-        <main className="page-shell">{children}</main>
+        <main id="main-content" className="page-shell" tabIndex={-1}>
+          {children}
+        </main>
       </body>
     </html>
   );
