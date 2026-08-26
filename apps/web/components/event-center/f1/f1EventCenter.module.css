@@ -106,6 +106,22 @@
   border-color: var(--color-text);
 }
 
+.coverageNotice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.coverageNotice strong {
+  color: var(--color-text);
+}
+
 /* ---- main layout ------------------------------------------------------ */
 
 .mainGrid {

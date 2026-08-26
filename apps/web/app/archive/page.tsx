@@ -29,6 +29,7 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
     season: scalar(raw.season),
     competition: scalar(raw.competition),
     status: scalar(raw.status),
+    kind: scalar(raw.kind),
     from: scalar(raw.from),
     to: scalar(raw.to),
     cursor: scalar(raw.cursor),
@@ -41,8 +42,8 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
     <main className={`${styles.shell} ${styles.f1}`}>
       <header className={styles.hero}>
         <p className={styles.eyebrow}>Formula 1 · database-backed · provider attributed</p>
-        <h1>Race archive</h1>
-        <p>Browse imported F1 seasons and open every race with detailed timing data.</p>
+        <h1>F1 archive</h1>
+        <p>Browse every imported F1 weekend, including honest session-by-session historical coverage.</p>
       </header>
       <form className={styles.filters} method="get">
         <label>
@@ -81,6 +82,14 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
           </select>
         </label>
         <label>
+          Event type
+          <select name="kind" defaultValue={filters.kind ?? ""}>
+            <option value="">All events</option>
+            <option value="race-weekend">Race weekends</option>
+            <option value="testing">Pre-season testing</option>
+          </select>
+        </label>
+        <label>
           From
           <input type="date" name="from" defaultValue={filters.from} />
         </label>
@@ -106,7 +115,9 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
                   <span>
                     {fixture.season.label} · {fixture.competition.name}
                   </span>
-                  <span className={styles.coverage}>{fixture.coverage.replace("-", " ")}</span>
+                  <span className={styles.coverage}>
+                    {fixture.kind === "testing" ? "testing" : fixture.coverage.replace("-", " ")}
+                  </span>
                 </div>
                 <h2>{fixture.name}</h2>
                 <p className={styles.meta}>
@@ -115,18 +126,22 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
                 </p>
                 <div className={styles.cardBottom}>
                   <span>{fixture.source?.provider ?? "Imported F1 record"}</span>
-                  <span>{fixture.detailAvailable ? "Open race →" : "Details importing"}</span>
+                  <span>
+                    {fixture.sessionCoverage.available > 0
+                      ? `${fixture.sessionCoverage.available}/${fixture.sessionCoverage.total} sessions available →`
+                      : fixture.sessionCoverage.unavailable > 0
+                        ? "Provider has no session detail →"
+                        : fixture.sessionCoverage.failed > 0
+                          ? "Import retry scheduled →"
+                          : "Summary available →"}
+                  </span>
                 </div>
               </>
             );
-            return fixture.detailAvailable ? (
+            return (
               <Link key={fixture.id} href={`/events/${fixture.id}`} className={styles.card}>
                 {content}
               </Link>
-            ) : (
-              <article key={fixture.id} className={styles.card}>
-                {content}
-              </article>
             );
           })}
         </section>

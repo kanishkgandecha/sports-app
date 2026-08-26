@@ -13,11 +13,11 @@ const requestedWindow = args.get("--years");
 const limit = Number(args.get("--limit") ?? 30);
 if ((requestedYear === undefined) === (requestedWindow === undefined)) {
   throw new Error(
-    "Usage: pnpm history:f1:details (--year=YYYY | --years=3) [--limit=30] [--fixture=id] [--session-types=RACE|ALL] [--dry-run]",
+    "Usage: pnpm history:f1:details (--year=YYYY | --years=3) [--limit=30] [--fixture=id] [--session-types=RACE|ALL] [--retry-failed] [--retry-unavailable] [--dry-run]",
   );
 }
 const years = requestedYear ? [Number(requestedYear)] : rollingSeasonYears(Number(requestedWindow));
-const sessionTypes = args.get("--session-types") === "ALL" ? "ALL" : ["RACE"];
+const sessionTypes = args.get("--session-types") === "RACE" ? ["RACE"] : "ALL";
 const provider = new OpenF1Adapter({
   client: new OpenF1FetchClient({
     maxRetries: 5,
@@ -34,6 +34,8 @@ for (const year of years) {
       limit,
       fixtureId: args.get("--fixture"),
       sessionTypes,
+      retryUnavailable: args.has("--retry-unavailable"),
+      retryFailed: args.has("--retry-failed"),
       dryRun: args.has("--dry-run"),
     }),
   );

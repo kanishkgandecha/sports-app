@@ -177,4 +177,107 @@ describe("F1 historical detail persistence (real Postgres)", () => {
     });
     await listener.end();
   });
+
+  it("persists a truthful terminal state when OpenF1 has no historical detail", async () => {
+    await resetDetailState();
+    let calls = 0;
+    const provider: F1DetailProvider = {
+      id: "openf1",
+      getHistoricalSessionDetail: async () => {
+        calls += 1;
+        return { teams: [], players: [], events: [], timingPatches: [] };
+      },
+    };
+
+    const first = await importF1Details(provider, {
+      year: 2024,
+      limit: 1,
+      fixtureId: FIXTURE_ID,
+      sessionTypes: "ALL",
+    });
+    const second = await importF1Details(provider, {
+      year: 2024,
+      limit: 1,
+      fixtureId: FIXTURE_ID,
+      sessionTypes: "ALL",
+    });
+
+    expect(first).toMatchObject({ matched: 1, imported: 0, skipped: 1, failed: 0, unavailable: 1 });
+    expect(second).toMatchObject({ matched: 1, imported: 0, skipped: 1, failed: 0, unavailable: 1 });
+    expect(calls).toBe(1);
+    await expect(
+      prisma.sessionDataProfile.findUniqueOrThrow({ where: { sessionId: SESSION_ID } }),
+    ).resolves.toMatchObject({
+      status: "upstream-unavailable",
+      attemptCount: 1,
+      nextRetryAt: null,
+    });
+    await expect(
+      prisma.fixtureDataProfile.findUniqueOrThrow({ where: { fixtureId: FIXTURE_ID } }),
+    ).resolves.toMatchObject({
+      coverage: "summary",
+    });
+  });
+
+  it("records transient failures with a future retry instead of claiming data is unavailable", async () => {
+    await resetDetailState();
+    let calls = 0;
+    const provider: F1DetailProvider = {
+      id: "openf1",
+      getHistoricalSessionDetail: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error("temporary upstream failure");
+        return detail();
+      },
+    };
+
+    const result = await importF1Details(provider, {
+      year: 2024,
+      limit: 1,
+      fixtureId: FIXTURE_ID,
+      sessionTypes: "ALL",
+      now: new Date("2024-01-02T00:00:00Z"),
+    });
+
+    expect(result).toMatchObject({ matched: 1, imported: 0, skipped: 0, failed: 1 });
+    await expect(
+      prisma.sessionDataProfile.findUniqueOrThrow({ where: { sessionId: SESSION_ID } }),
+    ).resolves.toMatchObject({
+      status: "failed",
+      reason: "temporary upstream failure",
+      nextRetryAt: new Date("2024-01-02T06:00:00Z"),
+    });
+
+    const deferred = await importF1Details(provider, {
+      year: 2024,
+      limit: 1,
+      fixtureId: FIXTURE_ID,
+      sessionTypes: "ALL",
+      now: new Date("2024-01-02T01:00:00Z"),
+    });
+    expect(deferred).toMatchObject({ imported: 0, skipped: 1, failed: 0 });
+    expect(calls).toBe(1);
+
+    const forced = await importF1Details(provider, {
+      year: 2024,
+      limit: 1,
+      fixtureId: FIXTURE_ID,
+      sessionTypes: "ALL",
+      retryFailed: true,
+      now: new Date("2024-01-02T01:00:00Z"),
+    });
+    expect(forced).toMatchObject({ imported: 1, skipped: 0, failed: 0 });
+    expect(calls).toBe(2);
+    await expect(
+      prisma.sessionDataProfile.findUniqueOrThrow({ where: { sessionId: SESSION_ID } }),
+    ).resolves.toMatchObject({ status: "available", attemptCount: 2, nextRetryAt: null });
+  });
 });
+
+async function resetDetailState() {
+  await prisma.providerCursor.deleteMany({ where: { providerId: "openf1-history-detail-v1", sessionId: SESSION_ID } });
+  await prisma.liveEvent.deleteMany({ where: { sessionId: SESSION_ID } });
+  await prisma.driverTiming.deleteMany({ where: { sessionId: SESSION_ID } });
+  await prisma.sessionDataProfile.deleteMany({ where: { sessionId: SESSION_ID } });
+  await prisma.fixtureDataProfile.update({ where: { fixtureId: FIXTURE_ID }, data: { coverage: "summary" } });
+}

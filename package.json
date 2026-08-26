@@ -24,7 +24,8 @@
     "db:generate": "pnpm --filter @sports/db exec prisma generate",
     "db:migrate": "node --env-file=.env scripts/run-with-root-env.mjs pnpm --filter @sports/db exec prisma migrate dev",
     "db:migrate:deploy": "node --env-file=.env scripts/run-with-root-env.mjs pnpm --filter @sports/db exec prisma migrate deploy",
-    "db:seed": "node --env-file=.env scripts/run-with-root-env.mjs pnpm --filter @sports/db exec tsx prisma/seed.ts"
+    "db:seed": "node --env-file=.env scripts/run-with-root-env.mjs pnpm --filter @sports/db exec tsx prisma/seed.ts",
+    "archive:f1:rolling": "pnpm --filter @sports/ingestion history:f1:rolling && pnpm --filter @sports/ingestion history:f1:standings:rolling && pnpm --filter @sports/ingestion history:f1:details:rolling"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

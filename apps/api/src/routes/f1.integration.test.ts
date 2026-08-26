@@ -92,6 +92,17 @@ async function seed() {
       endTime: new Date("2020-01-01T02:00:00Z"),
     },
   });
+  await prisma.sessionDataProfile.upsert({
+    where: { sessionId: SESSION_ID },
+    update: { status: "available", reason: null },
+    create: {
+      sessionId: SESSION_ID,
+      source: "openf1",
+      status: "available",
+      attemptCount: 1,
+      importedAt: new Date("2020-01-01T02:01:00Z"),
+    },
+  });
   // A currently-live session — used for freshness/lifecycle assertions.
   await prisma.session.upsert({
     where: { id: LIVE_SESSION_ID },
@@ -351,8 +362,8 @@ describe("F1 routes (integration, real Postgres)", () => {
     expect(body.sessions.map((s: { id: string }) => s.id)).toEqual([SESSION_ID, LIVE_SESSION_ID]);
     expect(body.fixture.detailAvailable).toBe(true);
     expect(body.sessions).toEqual([
-      expect.objectContaining({ id: SESSION_ID, detailAvailable: true }),
-      expect.objectContaining({ id: LIVE_SESSION_ID, detailAvailable: false }),
+      expect.objectContaining({ id: SESSION_ID, detailAvailable: true, detailStatus: "available" }),
+      expect.objectContaining({ id: LIVE_SESSION_ID, detailAvailable: false, detailStatus: "summary" }),
     ]);
   });
 

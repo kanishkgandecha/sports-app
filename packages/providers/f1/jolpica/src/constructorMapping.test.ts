@@ -8,6 +8,7 @@ describe("resolveTeamSlug — real 2026 constructor identity mismatches (docs/CO
     expect(resolveTeamSlug("haas")).toBe("haas-f1-team");
     expect(resolveTeamSlug("aston_martin")).toBe("aston-martin");
     expect(resolveTeamSlug("cadillac")).toBe("cadillac");
+    expect(resolveTeamSlug("sauber")).toBe("kick-sauber");
   });
 
   it("resolves every constructorId in the mapping table without a naive-slugify fallback warning", () => {

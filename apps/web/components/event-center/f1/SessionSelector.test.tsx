@@ -13,6 +13,9 @@ function session(overrides: Partial<F1Session>): F1Session {
     startTime: "2026-01-01T00:00:00Z",
     endTime: null,
     detailAvailable: true,
+    detailStatus: "available",
+    detailReason: null,
+    nextRetryAt: null,
     ...overrides,
   };
 }
@@ -46,5 +49,13 @@ describe("SessionSelector", () => {
     const sessions = [session({ id: "race", type: "RACE", lifecycle: "live" })];
     render(<SessionSelector sessions={sessions} activeSessionId="race" onSelect={vi.fn()} />);
     expect(screen.getByText("Race ·")).toBeInTheDocument();
+  });
+
+  it("labels a completed session whose provider has no historical detail", () => {
+    const sessions = [
+      session({ id: "fp1", type: "FP1", detailAvailable: false, detailStatus: "upstream-unavailable" }),
+    ];
+    render(<SessionSelector sessions={sessions} activeSessionId="fp1" onSelect={vi.fn()} />);
+    expect(screen.getByText("FP1 · unavailable")).toBeInTheDocument();
   });
 });

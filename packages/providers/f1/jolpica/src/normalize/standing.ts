@@ -51,6 +51,8 @@ export function normalizeDriverStanding(
     extra: {
       wins: Number(entry.wins),
       driverCode: entry.Driver.code ?? null,
+      driverName: `${entry.Driver.givenName} ${entry.Driver.familyName}`,
+      teamName: primaryConstructor?.name ?? null,
       // A driver can change teams mid-season; Jolpica lists every
       // constructor they scored points for that season, most recent last.
       // We surface the current one as `teamId` for display, and the full
@@ -78,6 +80,7 @@ export function normalizeConstructorStanding(
     position: Number(entry.position),
     extra: {
       wins: Number(entry.wins),
+      teamName: entry.Constructor.name,
       jolpicaConstructorId: entry.Constructor.constructorId,
     },
   };

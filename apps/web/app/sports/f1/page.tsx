@@ -108,13 +108,9 @@ export default async function F1LandingPage() {
                     {featuredFixture.venue.name}, {featuredFixture.venue.country}
                   </span>
                 )}
-                {featuredFixture.detailAvailable ? (
-                  <Link href={`/events/${featuredFixture.id}`} className={styles.heroCta}>
-                    Open Event Center →
-                  </Link>
-                ) : (
-                  <span className={styles.heroCta}>Detailed data pending</span>
-                )}
+                <Link href={`/events/${featuredFixture.id}`} className={styles.heroCta}>
+                  Open Event Center →
+                </Link>
               </div>
             </>
           ) : (
@@ -245,15 +241,9 @@ function FixtureList({ fixtures }: { fixtures: F1Fixture[] }) {
     <ul className={styles.fixtureList}>
       {fixtures.map((fixture) => (
         <li key={fixture.id}>
-          {fixture.detailAvailable ? (
-            <Link href={`/events/${fixture.id}`} className={styles.fixtureRow}>
-              <FixtureRowContent fixture={fixture} />
-            </Link>
-          ) : (
-            <span className={styles.fixtureRow} aria-disabled="true">
-              <FixtureRowContent fixture={fixture} />
-            </span>
-          )}
+          <Link href={`/events/${fixture.id}`} className={styles.fixtureRow}>
+            <FixtureRowContent fixture={fixture} />
+          </Link>
         </li>
       ))}
     </ul>

@@ -43,11 +43,18 @@ Archive page views read PostgreSQL only and never call a provider. Imports are e
 # Calendar/race summaries
 pnpm --filter @sports/ingestion history:f1:rolling
 
-# Timing, laps, pit stops, and race-control detail
+# Timing, laps, pit stops, and race-control detail for every completed
+# practice, qualifying, sprint, and race session
 pnpm --filter @sports/ingestion history:f1:details:rolling
+
+# Historical driver and constructor standings
+pnpm --filter @sports/ingestion history:f1:standings:rolling
+
+# Complete workflow: summaries, every possible session detail, standings
+pnpm archive:f1:rolling
 ```
 
-OpenF1 supplies session detail and Jolpica supplies historical/reference data and standings. If OpenF1 has no detail for a session, the archive displays it honestly as summary-only.
+OpenF1 supplies session detail and Jolpica supplies historical/reference data and standings. Imports resume per session. If OpenF1 has no detail for a completed session, that permanent upstream limitation is stored and displayed instead of retrying forever or showing an empty screen. Transient failures retain a retry time.
 
 ## Quality gates
 

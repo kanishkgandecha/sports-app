@@ -29,7 +29,12 @@ export async function f1Routes(app: FastifyInstance) {
         where: { sport: { slug: "f1" } },
         orderBy: { startTime: order },
         ...(req.query.status ? {} : { take: limit }),
-        include: { venue: true, sessions: { select: { id: true, startTime: true, endTime: true } } },
+        include: {
+          venue: true,
+          sessions: {
+            select: { id: true, startTime: true, endTime: true, dataProfile: { select: { status: true } } },
+          },
+        },
       });
       const detailIds = await detailedF1SessionIds(fixtures.flatMap((fixture) => fixture.sessions.map((s) => s.id)));
       return {
@@ -37,7 +42,9 @@ export async function f1Routes(app: FastifyInstance) {
           .map((fixture) =>
             toFixtureSummary(
               fixture,
-              fixture.sessions.some((session) => detailIds.has(session.id)),
+              fixture.sessions.some(
+                (session) => session.dataProfile?.status === "available" || detailIds.has(session.id),
+              ),
               deriveF1FixtureStatus(fixture),
             ),
           )
@@ -50,7 +57,7 @@ export async function f1Routes(app: FastifyInstance) {
   app.get<{ Params: { fixtureId: string } }>("/api/f1/fixtures/:fixtureId", async (req, reply) => {
     const fixture = await prisma.fixture.findFirst({
       where: { id: req.params.fixtureId, sport: { slug: "f1" } },
-      include: { venue: true, sessions: { orderBy: { startTime: "asc" } } },
+      include: { venue: true, sessions: { orderBy: { startTime: "asc" }, include: { dataProfile: true } } },
     });
     if (!fixture) {
       // Also correctly 404s for a real fixture id belonging to a different
@@ -61,10 +68,12 @@ export async function f1Routes(app: FastifyInstance) {
     return {
       fixture: toFixtureSummary(
         fixture,
-        fixture.sessions.some((session) => detailIds.has(session.id)),
+        fixture.sessions.some((session) => session.dataProfile?.status === "available" || detailIds.has(session.id)),
         deriveF1FixtureStatus(fixture),
       ),
-      sessions: fixture.sessions.map((session) => toSessionSummary(session, detailIds.has(session.id))),
+      sessions: fixture.sessions.map((session) =>
+        toSessionSummary(session, session.dataProfile?.status === "available" || detailIds.has(session.id)),
+      ),
     };
   });
 
@@ -72,6 +81,7 @@ export async function f1Routes(app: FastifyInstance) {
     const session = await prisma.session.findUnique({
       where: { id: req.params.sessionId },
       include: {
+        dataProfile: true,
         fixture: {
           include: { venue: true, sessions: { select: { startTime: true, endTime: true } } },
         },
@@ -84,7 +94,7 @@ export async function f1Routes(app: FastifyInstance) {
     const freshness = await getSessionFreshness(session.id, isLive);
     const detailIds = await detailedF1SessionIds([session.id]);
     return {
-      session: toSessionSummary(session, detailIds.has(session.id)),
+      session: toSessionSummary(session, session.dataProfile?.status === "available" || detailIds.has(session.id)),
       fixture: toFixtureSummary(session.fixture, detailIds.has(session.id), deriveF1FixtureStatus(session.fixture)),
       freshness,
     };
@@ -183,14 +193,19 @@ export async function f1Routes(app: FastifyInstance) {
     return {
       season: { year: season.label, id: season.id },
       standings: rows.map((row) => {
-        const driver = drivers.get(row.entityId) ?? unknownDriver(row.entityId);
+        const driver = drivers.get(row.entityId) ?? standingDriver(row.entityId, row.extra);
         const teamId = extraTeamId(row.extra);
         return {
           position: row.position,
           points: row.points,
           wins: extraWins(row.extra),
           driver: { id: driver.id, name: driver.name, shortName: driver.shortName, avatarUrl: driver.avatarUrl },
-          team: (teamId ? teams.get(teamId) : undefined) ?? driver.team ?? null,
+          team:
+            (teamId ? teams.get(teamId) : undefined) ??
+            driver.team ??
+            (teamId && extraString(row.extra, "teamName")
+              ? { id: teamId, name: extraString(row.extra, "teamName")!, colorHex: null }
+              : null),
         };
       }),
     };
@@ -214,7 +229,11 @@ export async function f1Routes(app: FastifyInstance) {
         position: row.position,
         points: row.points,
         wins: extraWins(row.extra),
-        team: teams.get(row.entityId) ?? { id: row.entityId, name: row.entityId, colorHex: null },
+        team: teams.get(row.entityId) ?? {
+          id: row.entityId,
+          name: extraString(row.extra, "teamName") ?? row.entityId,
+          colorHex: null,
+        },
       })),
     };
   });
@@ -293,6 +312,20 @@ function extraTeamId(extra: unknown): string | null {
   return typeof teamId === "string" ? teamId : null;
 }
 
+function extraString(extra: unknown, key: string): string | null {
+  if (typeof extra !== "object" || extra === null || !(key in extra)) return null;
+  const value = (extra as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+function standingDriver(driverId: string, extra: unknown) {
+  return {
+    ...unknownDriver(driverId),
+    name: extraString(extra, "driverName") ?? driverId,
+    shortName: extraString(extra, "driverCode"),
+  };
+}
+
 async function driversById(driverIds: string[]) {
   const unique = [...new Set(driverIds)];
   const players = await prisma.player.findMany({
@@ -348,6 +381,7 @@ function toSessionSummary(
     status: string;
     startTime: Date;
     endTime: Date | null;
+    dataProfile?: { status: string; reason: string | null; nextRetryAt: Date | null } | null;
   },
   detailAvailable = false,
 ) {
@@ -362,6 +396,9 @@ function toSessionSummary(
     startTime: session.startTime.toISOString(),
     endTime: session.endTime ? session.endTime.toISOString() : null,
     detailAvailable,
+    detailStatus: detailAvailable ? "available" : (session.dataProfile?.status ?? "summary"),
+    detailReason: session.dataProfile?.reason ?? null,
+    nextRetryAt: session.dataProfile?.nextRetryAt?.toISOString() ?? null,
   };
 }
 

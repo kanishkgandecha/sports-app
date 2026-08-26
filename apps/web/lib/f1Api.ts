@@ -31,6 +31,7 @@ export interface F1Fixture {
 }
 
 export type F1SessionLifecycle = "upcoming" | "live" | "completed";
+export type F1SessionDetailStatus = "summary" | "importing" | "available" | "upstream-unavailable" | "failed";
 
 export interface F1Session {
   id: string;
@@ -40,6 +41,9 @@ export interface F1Session {
   startTime: string;
   endTime: string | null;
   detailAvailable: boolean;
+  detailStatus: F1SessionDetailStatus;
+  detailReason: string | null;
+  nextRetryAt: string | null;
 }
 
 export interface F1DriverRef {

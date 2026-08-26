@@ -15,6 +15,8 @@ export interface F1DetailImportOptions {
   limit: number;
   fixtureId?: string;
   sessionTypes?: string[] | "ALL";
+  retryUnavailable?: boolean;
+  retryFailed?: boolean;
   dryRun?: boolean;
   now?: Date;
 }
@@ -25,6 +27,7 @@ interface DetailSession {
   type: string;
   status: string;
   endTime: Date | null;
+  dataProfile?: { status: string; nextRetryAt: Date | null } | null;
 }
 
 export function selectCompletedDetailSessions(
@@ -47,7 +50,8 @@ export async function importF1Details(provider: F1DetailProvider, options: F1Det
   if (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 30)
     throw new Error("limit must be from 1 to 30");
 
-  const sessionTypes = options.sessionTypes ?? ["RACE"];
+  const sessionTypes = options.sessionTypes ?? "ALL";
+  const now = options.now ?? new Date();
   const fixtures = await prisma.fixture.findMany({
     where: {
       sport: { slug: "f1" },
@@ -61,13 +65,18 @@ export async function importF1Details(provider: F1DetailProvider, options: F1Det
       id: true,
       sessions: {
         orderBy: [{ startTime: "asc" }, { id: "asc" }],
-        select: { id: true, fixtureId: true, type: true, status: true, endTime: true },
+        select: {
+          id: true,
+          fixtureId: true,
+          type: true,
+          status: true,
+          endTime: true,
+          dataProfile: { select: { status: true, nextRetryAt: true } },
+        },
       },
     },
   });
-  const targets = fixtures.flatMap((fixture) =>
-    selectCompletedDetailSessions(fixture.sessions, sessionTypes, options.now ?? new Date()),
-  );
+  const targets = fixtures.flatMap((fixture) => selectCompletedDetailSessions(fixture.sessions, sessionTypes, now));
   if (options.dryRun)
     return {
       runId: null,
@@ -76,6 +85,7 @@ export async function importF1Details(provider: F1DetailProvider, options: F1Det
       imported: 0,
       skipped: targets.length,
       failed: 0,
+      unavailable: 0,
     };
 
   const typeKey = sessionTypes === "ALL" ? "all" : [...sessionTypes].sort().join(",").toLowerCase();
@@ -103,25 +113,87 @@ export async function importF1Details(provider: F1DetailProvider, options: F1Det
   let imported = 0;
   let skipped = 0;
   let failed = 0;
+  let unavailable = 0;
   const errors: string[] = [];
   for (const session of targets) {
+    if (session.dataProfile?.status === "upstream-unavailable" && !options.retryUnavailable) {
+      unavailable += 1;
+      skipped += 1;
+      continue;
+    }
+    if (
+      session.dataProfile?.status === "available" ||
+      (session.dataProfile?.status === "failed" &&
+        !options.retryFailed &&
+        session.dataProfile.nextRetryAt &&
+        session.dataProfile.nextRetryAt > now)
+    ) {
+      skipped += 1;
+      continue;
+    }
     const cursor = await prisma.providerCursor.findUnique({
       where: { providerId_sessionId: { providerId: CURSOR_PROVIDER, sessionId: session.id } },
     });
     if (cursor?.cursor === "complete") {
+      await markSessionAvailable(session.id, now);
       skipped += 1;
       continue;
     }
     try {
+      await prisma.sessionDataProfile.upsert({
+        where: { sessionId: session.id },
+        update: {
+          source: provider.id,
+          status: "importing",
+          reason: null,
+          attemptCount: { increment: 1 },
+          lastAttemptAt: now,
+          nextRetryAt: null,
+        },
+        create: {
+          sessionId: session.id,
+          source: provider.id,
+          status: "importing",
+          attemptCount: 1,
+          lastAttemptAt: now,
+        },
+      });
       const detail = await provider.getHistoricalSessionDetail(session.id);
-      if (detail.timingPatches.length === 0 && detail.events.length === 0)
-        throw new Error("OpenF1 returned no historical detail");
+      if (detail.timingPatches.length === 0 && detail.events.length === 0) {
+        await prisma.sessionDataProfile.update({
+          where: { sessionId: session.id },
+          data: {
+            status: "upstream-unavailable",
+            reason: "OpenF1 has no historical event data for this completed session.",
+            nextRetryAt: null,
+          },
+        });
+        await refreshFixtureCoverage(session.fixtureId);
+        unavailable += 1;
+        skipped += 1;
+        continue;
+      }
       await persistSessionDetail(session.fixtureId, session.id, detail);
       imported += 1;
     } catch (error) {
       failed += 1;
-      const message = `${session.id}: ${error instanceof Error ? error.message : String(error)}`;
+      const reason = error instanceof Error ? error.message : String(error);
+      const message = `${session.id}: ${reason}`;
       errors.push(message);
+      await prisma.sessionDataProfile.upsert({
+        where: { sessionId: session.id },
+        update: { status: "failed", reason: reason.slice(0, 1_000), nextRetryAt: retryAt(now) },
+        create: {
+          sessionId: session.id,
+          source: provider.id,
+          status: "failed",
+          reason: reason.slice(0, 1_000),
+          attemptCount: 1,
+          lastAttemptAt: now,
+          nextRetryAt: retryAt(now),
+        },
+      });
+      await refreshFixtureCoverage(session.fixtureId);
       console.error(`[f1-detail] ${message}`);
     }
   }
@@ -135,9 +207,16 @@ export async function importF1Details(provider: F1DetailProvider, options: F1Det
       skippedCount: skipped,
       failedCount: failed,
       error: errors.length > 0 ? errors.join("\n").slice(0, 2_000) : null,
+      metadata: {
+        year: options.year,
+        limit: options.limit,
+        fixtureId: options.fixtureId ?? null,
+        sessionTypes,
+        unavailable,
+      },
     },
   });
-  return { runId: run.id, year: options.year, matched: targets.length, imported, skipped, failed };
+  return { runId: run.id, year: options.year, matched: targets.length, imported, skipped, failed, unavailable };
 }
 
 async function persistSessionDetail(
@@ -174,9 +253,9 @@ async function persistSessionDetail(
         skipDuplicates: true,
       });
       for (const patch of detail.timingPatches) await upsertTiming(tx, patch);
-      await tx.fixtureDataProfile.update({
-        where: { fixtureId },
-        data: { coverage: "event-data", importedAt: new Date() },
+      await tx.sessionDataProfile.update({
+        where: { sessionId },
+        data: { status: "available", reason: null, nextRetryAt: null, importedAt: new Date() },
       });
       await tx.providerCursor.upsert({
         where: { providerId_sessionId: { providerId: CURSOR_PROVIDER, sessionId } },
@@ -186,6 +265,36 @@ async function persistSessionDetail(
     },
     { timeout: 120_000 },
   );
+  await refreshFixtureCoverage(fixtureId);
+}
+
+async function markSessionAvailable(sessionId: string, now: Date) {
+  await prisma.sessionDataProfile.upsert({
+    where: { sessionId },
+    update: { status: "available", reason: null, nextRetryAt: null, importedAt: now },
+    create: {
+      sessionId,
+      source: "openf1",
+      status: "available",
+      attemptCount: 1,
+      lastAttemptAt: now,
+      importedAt: now,
+    },
+  });
+}
+
+async function refreshFixtureCoverage(fixtureId: string) {
+  const sessions = await prisma.session.findMany({
+    where: { fixtureId, OR: [{ status: "completed" }, { endTime: { lte: new Date() } }] },
+    select: { dataProfile: { select: { status: true } } },
+  });
+  const available = sessions.filter((session) => session.dataProfile?.status === "available").length;
+  const coverage = available === 0 ? "summary" : available === sessions.length ? "event-data" : "partial";
+  await prisma.fixtureDataProfile.update({ where: { fixtureId }, data: { coverage, importedAt: new Date() } });
+}
+
+function retryAt(now: Date) {
+  return new Date(now.getTime() + 6 * 60 * 60 * 1_000);
 }
 
 async function persistRoster(tx: Prisma.TransactionClient, sportId: string, teams: Team[], players: Player[]) {

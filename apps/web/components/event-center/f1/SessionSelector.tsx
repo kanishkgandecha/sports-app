@@ -41,6 +41,7 @@ export function SessionSelector({
           >
             {SESSION_LABEL[session.type] ?? session.type}
             {session.lifecycle === "live" && " ·"}
+            {session.detailStatus === "upstream-unavailable" && " · unavailable"}
           </button>
         );
       })}

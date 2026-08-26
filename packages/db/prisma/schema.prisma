@@ -135,7 +135,7 @@ model FixtureDataProfile {
   fixtureId      String   @unique
   source         String
   externalId     String
-  coverage       String // "summary" | "event-data"
+  coverage       String // "summary" | "partial" | "event-data"
   attribution    String?
   sourceRevision String?
   datePrecision  String? // "instant" | "day"
@@ -181,9 +181,30 @@ model Session {
 
   fixture    Fixture     @relation(fields: [fixtureId], references: [id])
   liveEvents LiveEvent[]
+  dataProfile SessionDataProfile?
 
   @@index([fixtureId])
   @@index([status])
+}
+
+/// Import state belongs to a session, because providers can expose one part
+/// of a race weekend while having no historical detail for another.
+model SessionDataProfile {
+  id            String    @id @default(cuid())
+  sessionId     String    @unique
+  source        String
+  status        String // "summary" | "importing" | "available" | "upstream-unavailable" | "failed"
+  reason        String?
+  attemptCount  Int       @default(0)
+  lastAttemptAt DateTime?
+  nextRetryAt   DateTime?
+  importedAt    DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([source, status])
+  @@index([status, nextRetryAt])
 }
 
 /// Append-only. Never mutated after insert — corrections arrive as new rows.

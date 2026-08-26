@@ -142,7 +142,8 @@ export async function importF1Season(provider: SportsProvider, options: F1Histor
             externalId: fixture.id,
             // A summary refresh must never downgrade a fixture whose detailed
             // session data has already been imported.
-            coverage: existing?.coverage === "event-data" ? "event-data" : "summary",
+            coverage:
+              existing?.coverage === "event-data" || existing?.coverage === "partial" ? existing.coverage : "summary",
             attribution: attribution(provider.id),
             datePrecision: "instant",
             importedAt: new Date(),
