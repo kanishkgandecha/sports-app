@@ -185,7 +185,7 @@ function ClassificationTable({ rows }: { rows: F1SessionResult[] }) {
                 row.phases.map((phase, index) => <td key={index}>{formatLapTime(phase.duration)}</td>)
               ) : (
                 <>
-                  <td>{row.lapsCompleted}</td>
+                  <td>{row.lapsCompleted ?? "—"}</td>
                   <td>{classificationTime(row)}</td>
                   <td className={styles.pointsCell}>{row.points ?? "—"}</td>
                 </>

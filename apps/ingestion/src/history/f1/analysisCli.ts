@@ -43,6 +43,9 @@ for (const year of years) {
       retryUnavailable: args.has("--retry-unavailable"),
       force: args.has("--force"),
       dryRun: args.has("--dry-run"),
+      onProgress: ({ year: progressYear, current, total, sessionId, outcome }) => {
+        console.error(`[f1-analysis] ${progressYear} ${current}/${total} ${sessionId} ${outcome}`);
+      },
     }),
   );
 }

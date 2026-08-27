@@ -209,7 +209,9 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
       timingPatches: [...patches.values()],
       classifications: results.map((result) => normalizeSessionClassification(result, sessionId)),
       laps: laps.map((lap) => normalizeLapRecord(lap, sessionId)),
-      stints: stints.map((stint) => normalizeTyreStint(stint, sessionId)),
+      stints: stints
+        .map((stint) => normalizeTyreStint(stint, sessionId))
+        .filter((stint): stint is f1.TyreStint => stint !== null),
     };
   }
 
@@ -232,7 +234,9 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
     return {
       classifications: results.map((result) => normalizeSessionClassification(result, sessionId)),
       laps: laps.map((lap) => normalizeLapRecord(lap, sessionId)),
-      stints: stints.map((stint) => normalizeTyreStint(stint, sessionId)),
+      stints: stints
+        .map((stint) => normalizeTyreStint(stint, sessionId))
+        .filter((stint): stint is f1.TyreStint => stint !== null),
     };
   }
 

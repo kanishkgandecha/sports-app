@@ -87,7 +87,7 @@ export interface F1SessionResult {
   position: number | null;
   driver: F1DriverRef;
   status: "classified" | "dnf" | "dns" | "dsq";
-  lapsCompleted: number;
+  lapsCompleted: number | null;
   points: number | null;
   durationSeconds: number | null;
   gapToLeader: string | null;

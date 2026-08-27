@@ -56,7 +56,8 @@ export interface SessionClassification {
   driverId: string;
   position: number | null;
   status: SessionClassificationStatus;
-  lapsCompleted: number;
+  /** Null when OpenF1 does not report a lap count (observed for a disqualified driver). */
+  lapsCompleted: number | null;
   points: number | null;
   durationSeconds: number | null;
   gapToLeader: string | null;

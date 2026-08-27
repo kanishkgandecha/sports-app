@@ -18,6 +18,15 @@ export interface F1AnalysisImportOptions {
   force?: boolean;
   dryRun?: boolean;
   now?: Date;
+  onProgress?: (progress: F1AnalysisProgress) => void;
+}
+
+export interface F1AnalysisProgress {
+  year: number;
+  current: number;
+  total: number;
+  sessionId: string;
+  outcome: "imported" | "skipped" | "unavailable" | "failed";
 }
 
 export async function importF1Analysis(provider: F1AnalysisProvider, options: F1AnalysisImportOptions) {
@@ -89,17 +98,27 @@ export async function importF1Analysis(provider: F1AnalysisProvider, options: F1
   let unavailable = 0;
   const errors: string[] = [];
 
-  for (const session of targets) {
+  for (const [index, session] of targets.entries()) {
+    const report = (outcome: F1AnalysisProgress["outcome"]) =>
+      options.onProgress?.({
+        year: options.year,
+        current: index + 1,
+        total: targets.length,
+        sessionId: session.id,
+        outcome,
+      });
     const cursor = await prisma.providerCursor.findUnique({
       where: { providerId_sessionId: { providerId: ANALYSIS_CURSOR_PROVIDER, sessionId: session.id } },
     });
     if (!options.force && cursor?.cursor === "complete") {
       skipped += 1;
+      report("skipped");
       continue;
     }
     if (!options.force && !options.retryUnavailable && cursor?.cursor === "upstream-unavailable") {
       skipped += 1;
       unavailable += 1;
+      report("unavailable");
       continue;
     }
 
@@ -109,17 +128,20 @@ export async function importF1Analysis(provider: F1AnalysisProvider, options: F1
         await saveAnalysisCursor(session.id, "upstream-unavailable");
         unavailable += 1;
         skipped += 1;
+        report("unavailable");
         continue;
       }
 
       await persistSessionAnalysis(session.id, analysis);
       imported += 1;
+      report("imported");
     } catch (error) {
       failed += 1;
       const reason = error instanceof Error ? error.message : String(error);
       const message = `${session.id}: ${reason}`;
       errors.push(message);
       console.error(`[f1-analysis] ${message}`);
+      report("failed");
     }
   }
 

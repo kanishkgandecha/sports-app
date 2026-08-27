@@ -152,16 +152,21 @@ export function normalizeLapRecord(lap: OpenF1Lap, sessionId: string): f1.Lap {
   };
 }
 
-export function normalizeTyreStint(stint: OpenF1Stint, sessionId: string): f1.TyreStint {
+export function normalizeTyreStint(stint: OpenF1Stint, sessionId: string): f1.TyreStint | null {
+  // Observed in the full rolling backfill: OpenF1 can return practice-session
+  // stint rows with no lap_start. A normalized stint cannot truthfully exist
+  // without its required boundary, so discard only that unusable row rather
+  // than failing the entire session snapshot.
+  if (!Number.isInteger(stint.lap_start)) return null;
   return {
     id: `openf1-stint-${stint.session_key}-${stint.driver_number}-${stint.stint_number}`,
     sessionId,
     driverId: buildDriverId(stint.driver_number),
     stintNumber: stint.stint_number,
-    lapStart: stint.lap_start,
-    lapEnd: stint.lap_end,
+    lapStart: stint.lap_start!,
+    lapEnd: typeof stint.lap_end === "number" ? stint.lap_end : null,
     compound: stint.compound ? (stint.compound as f1.TyreCompound) : null,
-    tyreAgeAtStart: stint.tyre_age_at_start ?? null,
+    tyreAgeAtStart: typeof stint.tyre_age_at_start === "number" ? stint.tyre_age_at_start : null,
   };
 }
 

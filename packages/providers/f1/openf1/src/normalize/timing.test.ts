@@ -165,6 +165,12 @@ describe("Phase 2 analysis normalization", () => {
     });
   });
 
+  it("preserves an omitted disqualified-driver lap count as unknown rather than inventing zero", () => {
+    expect(
+      normalizeSessionClassification({ ...result, dsq: true, number_of_laps: null }, "f1-session-11344").lapsCompleted,
+    ).toBeNull();
+  });
+
   it("preserves every lap timing and speed field, including null duration", () => {
     expect(normalizeLapRecord({ ...realLap, lap_duration: null }, "f1-session-9574")).toMatchObject({
       driverId: "f1-driver-1",
@@ -185,6 +191,10 @@ describe("Phase 2 analysis normalization", () => {
       compound: realStint.compound,
       tyreAgeAtStart: realStint.tyre_age_at_start,
     });
+  });
+
+  it("drops a real-world incomplete stint row with no lap start instead of failing the session", () => {
+    expect(normalizeTyreStint({ ...realStint, lap_start: null }, "f1-session-9574")).toBeNull();
   });
 });
 

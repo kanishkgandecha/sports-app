@@ -333,7 +333,8 @@ model SessionClassification {
   driverId        String
   position        Int?
   status          String // "classified" | "dnf" | "dns" | "dsq"
-  lapsCompleted   Int
+  /// Null when the provider omits the classified lap count (observed for a disqualified driver).
+  lapsCompleted   Int?
   points          Float?
   durationSeconds Float?
   gapToLeader     String?
