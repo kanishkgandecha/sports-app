@@ -10,7 +10,7 @@ import {
   type F1Session,
 } from "../../../lib/f1Api";
 import { apiGet } from "../../../lib/api";
-import { formatDate } from "../../../lib/format";
+import { formatDate, formatDateTime } from "../../../lib/format";
 import styles from "./f1Landing.module.css";
 import { Countdown } from "../../../components/Countdown";
 
@@ -75,6 +75,9 @@ export default async function F1LandingPage() {
   const featuredFixture = live[0] ?? upcoming[0] ?? completed[0];
   const featuredDetail = featuredFixture ? await getF1Fixture(featuredFixture.id).catch(() => null) : null;
   const featuredSession = featuredDetail ? pickFeaturedSession(featuredDetail.sessions) : undefined;
+  const featuredHref = featuredFixture
+    ? `/events/${featuredFixture.id}${featuredSession ? `?session=${featuredSession.id}` : ""}`
+    : "/archive";
 
   const year = new Date().getFullYear();
   const [driverStandingsResult, constructorStandingsResult] = await Promise.allSettled([
@@ -101,6 +104,7 @@ export default async function F1LandingPage() {
           {featuredFixture ? (
             <>
               <h1 className={styles.title}>{featuredFixture.name}</h1>
+              <p className={styles.heroSummary}>{heroSummary(featuredFixture.status, featuredSession)}</p>
               <div className={styles.heroMeta}>
                 {featuredSession && featuredSession.lifecycle !== "completed" && (
                   <div className={styles.countdown}>
@@ -115,7 +119,7 @@ export default async function F1LandingPage() {
                     {featuredFixture.venue.name}, {featuredFixture.venue.country}
                   </span>
                 )}
-                <Link href={`/events/${featuredFixture.id}`} className={styles.heroCta}>
+                <Link href={featuredHref} className={styles.heroCta}>
                   Open Event Center →
                 </Link>
               </div>
@@ -132,27 +136,36 @@ export default async function F1LandingPage() {
           )}
 
           {featuredDetail && featuredDetail.sessions.length > 0 && (
-            <div className={styles.sessionStrip} role="list" aria-label="This weekend's sessions">
+            <ol className={styles.sessionStrip} aria-label="This weekend's sessions">
               {featuredDetail.sessions.map((session) => (
-                <div
-                  key={session.id}
-                  role="listitem"
-                  className={`${styles.sessionCard} ${session.lifecycle === "live" ? styles.sessionCardLive : ""}`}
-                >
-                  <span className={styles.sessionCardType}>{SESSION_LABEL[session.type] ?? session.type}</span>
-                  <span className={styles.sessionCardTime}>
-                    {session.lifecycle === "live" ? "LIVE" : formatDate(session.startTime)}
-                  </span>
-                </div>
+                <li key={session.id}>
+                  <Link
+                    href={`/events/${featuredFixture.id}?session=${session.id}`}
+                    className={`${styles.sessionCard} ${session.lifecycle === "live" ? styles.sessionCardLive : ""} ${session.id === featuredSession?.id ? styles.sessionCardActive : ""}`}
+                    aria-current={session.id === featuredSession?.id ? "true" : undefined}
+                  >
+                    <span className={styles.sessionCardTopline}>
+                      <span className={styles.sessionCardType}>{SESSION_LABEL[session.type] ?? session.type}</span>
+                      <span className={styles.sessionCardArrow} aria-hidden="true">
+                        →
+                      </span>
+                    </span>
+                    <span className={styles.sessionCardTime}>{formatDateTime(session.startTime)}</span>
+                    <span className={styles.sessionCardState}>{sessionStateLabel(session)}</span>
+                  </Link>
+                </li>
               ))}
-            </div>
+            </ol>
           )}
         </div>
       </section>
 
       <section className={styles.section} aria-label="Championship standings">
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Championship snapshot</h2>
+          <div>
+            <span className={styles.sectionEyebrow}>{year} title race</span>
+            <h2 className={styles.sectionTitle}>Championship snapshot</h2>
+          </div>
         </div>
         {(driverStandingsResult.status === "rejected" || constructorStandingsResult.status === "rejected") &&
         driverStandings.length === 0 &&
@@ -163,7 +176,10 @@ export default async function F1LandingPage() {
         ) : (
           <div className={styles.standingsGrid}>
             <div className={styles.standingsCard}>
-              <div className={styles.standingsCardHeader}>Drivers</div>
+              <div className={styles.standingsCardHeader}>
+                <span>Drivers</span>
+                <span>PTS</span>
+              </div>
               {driverStandings.map((s) => (
                 <div className={styles.standingsRow} key={s.driver.id}>
                   <span className={styles.standingsPos}>{s.position}</span>
@@ -178,7 +194,10 @@ export default async function F1LandingPage() {
               ))}
             </div>
             <div className={styles.standingsCard}>
-              <div className={styles.standingsCardHeader}>Constructors</div>
+              <div className={styles.standingsCardHeader}>
+                <span>Constructors</span>
+                <span>PTS</span>
+              </div>
               {constructorStandings.map((s) => (
                 <div className={styles.standingsRow} key={s.team.id}>
                   <span className={styles.standingsPos}>{s.position}</span>
@@ -198,7 +217,10 @@ export default async function F1LandingPage() {
 
       <section className={styles.section} aria-label="Recent results">
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Recent results</h2>
+          <div>
+            <span className={styles.sectionEyebrow}>What you missed</span>
+            <h2 className={styles.sectionTitle}>Recent results</h2>
+          </div>
           <Link href="/archive" className={styles.sectionLink}>
             Browse archive →
           </Link>
@@ -212,7 +234,10 @@ export default async function F1LandingPage() {
 
       <section className={styles.section} aria-label="Upcoming calendar">
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Upcoming calendar</h2>
+          <div>
+            <span className={styles.sectionEyebrow}>Plan the next race</span>
+            <h2 className={styles.sectionTitle}>Upcoming calendar</h2>
+          </div>
         </div>
         {upcoming.length === 0 ? (
           <p className={styles.emptyCopy}>No upcoming races loaded.</p>
@@ -241,6 +266,25 @@ function fixtureStatusLabel(status: string) {
   if (status === "live") return "Live weekend";
   if (status === "scheduled") return "Up next";
   return "Latest result";
+}
+
+function heroSummary(status: string, session: F1Session | undefined) {
+  if (session?.lifecycle === "live") {
+    return `${SESSION_LABEL[session.type] ?? session.type} is live now. Follow timing and race control as it happens.`;
+  }
+  if (status === "scheduled" && session) {
+    return `${SESSION_LABEL[session.type] ?? session.type} is the next session. Open the weekend hub for the complete schedule.`;
+  }
+  return "Catch up with session results, lap pace, tyre strategy, and race-control context from the latest weekend.";
+}
+
+function sessionStateLabel(session: F1Session) {
+  if (session.lifecycle === "live") return "Live now";
+  if (session.lifecycle === "upcoming") return "Scheduled";
+  if (session.detailStatus === "available") return "Results ready";
+  if (session.detailStatus === "importing") return "Importing data";
+  if (session.detailStatus === "upstream-unavailable") return "Summary only";
+  return "Completed";
 }
 
 function FixtureList({ fixtures }: { fixtures: F1Fixture[] }) {

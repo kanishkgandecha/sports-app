@@ -12,31 +12,56 @@ interface ConceptSummary {
   shortExplanation: string;
 }
 
-async function getF1Concepts(): Promise<ConceptSummary[]> {
+async function getF1Concepts(): Promise<{ concepts: ConceptSummary[]; unavailable: boolean }> {
   try {
     const { concepts } = await apiGet<{ concepts: ConceptSummary[] }>("/api/education/f1/concepts");
-    return concepts;
+    return { concepts, unavailable: false };
   } catch {
-    return [];
+    return { concepts: [], unavailable: true };
   }
 }
 
 /** The Formula 1 glossary as a standalone companion to contextual explanations. */
 export default async function LearnPage() {
-  const concepts = await getF1Concepts();
+  const { concepts, unavailable } = await getF1Concepts();
+  const beginnerCount = concepts.filter((concept) => concept.difficulty.toLowerCase() === "beginner").length;
 
   return (
     <>
-      <h1 className={styles.title}>Learn</h1>
-      <p className={styles.lede}>
-        Plain-language explanations for the things that happen live — browse them here, or tap &quot;What does this
-        mean?&quot; wherever they come up during a session.
-      </p>
+      <header className={styles.hero}>
+        <div className={styles.heroCopy}>
+          <span className={styles.kicker}>The race, decoded</span>
+          <h1 className={styles.title}>Learn F1</h1>
+          <p className={styles.lede}>
+            Plain-language explanations for the things that happen live. Start with the basics or quickly find the rule,
+            flag, or race situation you just saw.
+          </p>
+        </div>
+        {concepts.length > 0 && (
+          <dl className={styles.librarySummary} aria-label="Learning library summary">
+            <div>
+              <dt>Topics</dt>
+              <dd>{concepts.length}</dd>
+            </div>
+            <div>
+              <dt>Start here</dt>
+              <dd>{beginnerCount} beginner</dd>
+            </div>
+          </dl>
+        )}
+      </header>
       {concepts.length === 0 ? (
-        <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
-          No concepts loaded — start the API (see README) to populate this from the education content in
-          content/education/.
-        </p>
+        <section className={styles.emptyState} aria-labelledby="learn-empty-title">
+          <h2 id="learn-empty-title">{unavailable ? "Learning library unavailable" : "Learning library is empty"}</h2>
+          <p>
+            {unavailable
+              ? "We couldn't load the F1 explainers right now. Try this page again in a moment."
+              : "No F1 explainers have been published yet."}
+          </p>
+          <a href="/learn" className={styles.retryLink}>
+            Try again
+          </a>
+        </section>
       ) : (
         <LearnGrid concepts={concepts} />
       )}

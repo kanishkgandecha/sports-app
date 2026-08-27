@@ -69,6 +69,15 @@
   text-transform: uppercase;
   letter-spacing: -0.01em;
   line-height: 1.02;
+  text-wrap: balance;
+}
+
+.heroSummary {
+  max-width: var(--content-measure-wide);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-base);
 }
 
 .statusPill {
@@ -159,15 +168,21 @@
 /* ---- sessions strip ------------------------------------------------------ */
 
 .sessionStrip {
-  display: flex;
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-2);
-  overflow-x: auto;
-  padding-bottom: 2px;
+}
+
+.sessionStrip > li {
+  min-width: 0;
 }
 
 .sessionCard {
-  flex: 0 0 auto;
-  min-width: 120px;
+  height: 100%;
+  min-height: 106px;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -176,11 +191,32 @@
   border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.sessionCard:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
 }
 
 .sessionCardLive {
   border-color: var(--color-live);
   background: var(--color-live-soft);
+}
+
+.sessionCardActive {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 3px 0 var(--color-accent);
+}
+
+.sessionCardTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .sessionCardType {
@@ -190,10 +226,25 @@
   letter-spacing: 0.04em;
 }
 
+.sessionCardArrow {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
 .sessionCardTime {
   font-size: var(--font-size-xs);
-  color: var(--color-text-faint);
+  color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.sessionCardState {
+  margin-top: auto;
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* ---- generic section shell ------------------------------------------------ */
@@ -216,6 +267,17 @@
   font-size: var(--font-size-xl);
   text-transform: uppercase;
   letter-spacing: -0.01em;
+}
+
+.sectionEyebrow {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--color-text-faint);
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .sectionLink {
@@ -241,6 +303,10 @@
 }
 
 .standingsCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
   background: var(--color-surface-2);
   font-size: var(--font-size-xs);
@@ -395,6 +461,9 @@
     align-items: flex-start;
     flex-direction: column;
   }
+  .heroSummary {
+    font-size: var(--font-size-base);
+  }
   .heroCta {
     width: 100%;
     justify-content: center;
@@ -402,7 +471,19 @@
   .sessionCard {
     min-height: var(--control-min-height);
   }
+  .sessionStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sectionHeader {
+    align-items: flex-end;
+  }
   .fixtureRow {
     min-height: var(--list-row-min-height-mobile);
+  }
+}
+
+@media (max-width: 400px) {
+  .sessionStrip {
+    grid-template-columns: 1fr;
   }
 }
