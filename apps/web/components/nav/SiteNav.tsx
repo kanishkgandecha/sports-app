@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import styles from "./SiteNav.module.css";
 
 const NAV_ITEMS = [
-  { label: "Race Center", href: "/" },
-  { label: "Archive", href: "/archive" },
-  { label: "Learn F1", href: "/learn" },
+  { label: "Race Center", href: "/", sections: ["/sports/f1", "/events"] },
+  { label: "Archive", href: "/archive", sections: [] },
+  { label: "Learn F1", href: "/learn", sections: [] },
 ] as const;
 
 export function SiteNav() {
@@ -22,7 +22,10 @@ export function SiteNav() {
         </Link>
         <nav className={styles.links} aria-label="Formula 1">
           {NAV_ITEMS.map((item) => {
-            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            const isActive =
+              pathname === item.href ||
+              (item.href !== "/" && pathname.startsWith(`${item.href}/`)) ||
+              item.sections.some((section) => pathname === section || pathname.startsWith(`${section}/`));
             return (
               <Link
                 key={item.href}

@@ -64,7 +64,9 @@ a {
    layouts (e.g. /sports/f1's full-bleed hero) can opt out of the max-width
    constraint locally instead of every page being forced through it. */
 .page-shell {
-  max-width: 960px;
+  width: 100%;
+  max-width: var(--content-wide-max-width);
+  min-width: 0;
   margin: 0 auto;
   padding: var(--space-7) var(--space-6);
   display: flex;

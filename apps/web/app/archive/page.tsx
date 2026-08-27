@@ -13,7 +13,10 @@ export default function ArchivePage({ searchParams }: { searchParams: RawSearchP
     <Suspense
       fallback={
         <div className={styles.shell}>
-          <p className={styles.empty}>Loading archive…</p>
+          <div className={styles.emptyState} role="status">
+            <h2>Loading archive</h2>
+            <p>Preparing the race index and coverage details…</p>
+          </div>
         </div>
       }
     >
@@ -45,17 +48,37 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
     },
     { summary: 0, partial: 0, "event-data": 0 },
   );
+  const availableSessions = results?.fixtures.reduce((total, fixture) => total + fixture.sessionCoverage.available, 0);
+  const advancedFilterCount = [filters.competition, filters.kind, filters.from, filters.to].filter(Boolean).length;
+  const activeFilters = archiveFilterLabels(filters, options);
+
   return (
     <div className={styles.shell}>
       <header className={styles.hero}>
-        <p className={styles.eyebrow}>Formula 1 · database-backed · provider attributed</p>
-        <h1>F1 archive</h1>
-        <p>Browse every imported F1 weekend, including honest session-by-session historical coverage.</p>
+        <div className={styles.heroContent}>
+          <p className={styles.eyebrow}>Formula 1 · database-backed · provider attributed</p>
+          <h1>F1 archive</h1>
+          <p>Find a race weekend fast, then see exactly how much session data is ready before opening it.</p>
+        </div>
+        <dl className={styles.heroStats} aria-label="Archive summary">
+          <div>
+            <dt>Seasons</dt>
+            <dd>{options?.seasons.length ?? "—"}</dd>
+          </div>
+          <div>
+            <dt>On this page</dt>
+            <dd>{results?.fixtures.length ?? "—"}</dd>
+          </div>
+          <div>
+            <dt>Sessions ready</dt>
+            <dd>{availableSessions ?? "—"}</dd>
+          </div>
+        </dl>
       </header>
       <form className={styles.filters} method="get" aria-label="Filter the F1 archive">
-        <label>
+        <label className={styles.searchField}>
           Search
-          <input name="q" defaultValue={filters.q} placeholder="Grand Prix or circuit" />
+          <input name="q" type="search" defaultValue={filters.q} placeholder="Grand Prix, circuit, or country" />
         </label>
         <label>
           Season
@@ -69,17 +92,6 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
           </select>
         </label>
         <label>
-          Competition
-          <select name="competition" defaultValue={filters.competition ?? ""}>
-            <option value="">All competitions</option>
-            {options?.competitions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
           Status
           <select name="status" defaultValue={filters.status ?? ""}>
             <option value="">Any status</option>
@@ -88,31 +100,78 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
             <option value="live">Live</option>
           </select>
         </label>
-        <label>
-          Event type
-          <select name="kind" defaultValue={filters.kind ?? ""}>
-            <option value="">All events</option>
-            <option value="race-weekend">Race weekends</option>
-            <option value="testing">Pre-season testing</option>
-          </select>
-        </label>
-        <label>
-          From
-          <input type="date" name="from" defaultValue={filters.from} />
-        </label>
-        <label>
-          To
-          <input type="date" name="to" defaultValue={filters.to} />
-        </label>
+        <details className={styles.advancedFilters} open={advancedFilterCount > 0}>
+          <summary>
+            <span>Advanced filters</span>
+            <span className={styles.advancedCount}>
+              {advancedFilterCount > 0 ? `${advancedFilterCount} active` : "Competition, event type, dates"}
+            </span>
+          </summary>
+          <div className={styles.advancedGrid}>
+            <label>
+              Competition
+              <select name="competition" defaultValue={filters.competition ?? ""}>
+                <option value="">All competitions</option>
+                {options?.competitions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Event type
+              <select name="kind" defaultValue={filters.kind ?? ""}>
+                <option value="">All events</option>
+                <option value="race-weekend">Race weekends</option>
+                <option value="testing">Pre-season testing</option>
+              </select>
+            </label>
+            <label>
+              From
+              <input type="date" name="from" defaultValue={filters.from} />
+            </label>
+            <label>
+              To
+              <input type="date" name="to" defaultValue={filters.to} />
+            </label>
+          </div>
+        </details>
         <div className={styles.actions}>
           <button type="submit">Apply filters</button>
-          <Link href="/archive">Clear</Link>
+          {activeFilters.length > 0 && <Link href="/archive">Clear all</Link>}
         </div>
       </form>
+      {activeFilters.length > 0 && (
+        <div className={styles.activeFilters} role="group" aria-label="Active archive filters">
+          <span className={styles.activeFiltersLabel}>Active filters</span>
+          <ul>
+            {activeFilters.map((filter) => {
+              const query = buildArchiveQuery({ ...filters, [filter.key]: undefined, cursor: undefined });
+              return (
+                <li key={filter.key}>
+                  <Link href={query ? `/archive?${query}` : "/archive"} aria-label={`Remove ${filter.label} filter`}>
+                    {filter.label}
+                    <span aria-hidden="true">×</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       {!results ? (
-        <p className={styles.empty}>The archive API is temporarily unavailable.</p>
+        <div className={styles.emptyState} role="status">
+          <h2>The archive is temporarily unavailable</h2>
+          <p>We couldn’t load the race index. The rest of F1 Race Center is still available.</p>
+          <Link href="/archive">Try again</Link>
+        </div>
       ) : results.fixtures.length === 0 ? (
-        <p className={styles.empty}>No imported races match these filters.</p>
+        <div className={styles.emptyState}>
+          <h2>No weekends match</h2>
+          <p>Try a broader season, status, or date range.</p>
+          <Link href="/archive">Clear filters</Link>
+        </div>
       ) : (
         <section aria-labelledby="archive-results-title">
           <div className={styles.resultsHeader}>
@@ -147,18 +206,39 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
                   {formatDate(fixture.startTime)}
                   {venueLine(fixture.venue) && ` · ${venueLine(fixture.venue)}`}
                 </p>
+                <div className={styles.sessionCoverage}>
+                  <div className={styles.coverageTrack} aria-hidden="true">
+                    {fixture.sessionCoverage.available > 0 && (
+                      <span
+                        className={styles.coverageAvailable}
+                        style={{ flexGrow: fixture.sessionCoverage.available }}
+                      />
+                    )}
+                    {fixture.sessionCoverage.unavailable > 0 && (
+                      <span
+                        className={styles.coverageUnavailable}
+                        style={{ flexGrow: fixture.sessionCoverage.unavailable }}
+                      />
+                    )}
+                    {fixture.sessionCoverage.failed > 0 && (
+                      <span className={styles.coverageFailed} style={{ flexGrow: fixture.sessionCoverage.failed }} />
+                    )}
+                    {fixture.sessionCoverage.importing > 0 && (
+                      <span
+                        className={styles.coverageImporting}
+                        style={{ flexGrow: fixture.sessionCoverage.importing }}
+                      />
+                    )}
+                    {pendingSessionCount(fixture) > 0 && (
+                      <span className={styles.coveragePending} style={{ flexGrow: pendingSessionCount(fixture) }} />
+                    )}
+                  </div>
+                  <span>{sessionCoverageLabel(fixture)}</span>
+                </div>
                 <div className={styles.cardBottom}>
                   <span>{fixture.source?.provider ?? "Imported F1 record"}</span>
                   <span className={styles.cardAction}>
-                    {fixture.sessionCoverage.available > 0
-                      ? `${fixture.sessionCoverage.available}/${fixture.sessionCoverage.total} sessions available`
-                      : fixture.sessionCoverage.unavailable > 0
-                        ? "Provider has no session detail"
-                        : fixture.sessionCoverage.failed > 0
-                          ? "Import retry scheduled"
-                          : fixture.status === "scheduled"
-                            ? "Weekend scheduled"
-                            : "Summary available"}
+                    Open weekend
                     <span aria-hidden="true">→</span>
                   </span>
                 </div>
@@ -188,4 +268,47 @@ function coverageLabel(fixture: Awaited<ReturnType<typeof getArchiveFixtures>>["
 
 function scalar(value: string | string[] | undefined) {
   return typeof value === "string" ? value : value?.[0];
+}
+
+function archiveFilterLabels(filters: ArchiveFilters, options: Awaited<ReturnType<typeof getArchiveOptions>> | null) {
+  const labels: Array<{ key: string; label: string }> = [];
+  if (filters.q) labels.push({ key: "q", label: `Search: ${filters.q}` });
+  if (filters.season) {
+    labels.push({
+      key: "season",
+      label: `Season: ${options?.seasons.find((option) => option.id === filters.season)?.label ?? filters.season}`,
+    });
+  }
+  if (filters.status) labels.push({ key: "status", label: `Status: ${titleCase(filters.status)}` });
+  if (filters.competition) {
+    labels.push({
+      key: "competition",
+      label: `Competition: ${options?.competitions.find((option) => option.id === filters.competition)?.name ?? filters.competition}`,
+    });
+  }
+  if (filters.kind) labels.push({ key: "kind", label: `Event: ${titleCase(filters.kind)}` });
+  if (filters.from) labels.push({ key: "from", label: `From: ${filters.from}` });
+  if (filters.to) labels.push({ key: "to", label: `To: ${filters.to}` });
+  return labels;
+}
+
+function titleCase(value: string) {
+  return value.replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+type Fixture = Awaited<ReturnType<typeof getArchiveFixtures>>["fixtures"][number];
+
+function pendingSessionCount(fixture: Fixture) {
+  const coverage = fixture.sessionCoverage;
+  return Math.max(0, coverage.total - coverage.available - coverage.unavailable - coverage.failed - coverage.importing);
+}
+
+function sessionCoverageLabel(fixture: Fixture) {
+  const coverage = fixture.sessionCoverage;
+  if (coverage.available > 0) return `${coverage.available} of ${coverage.total} sessions ready`;
+  if (coverage.failed > 0) return "Session import retry scheduled";
+  if (coverage.importing > 0) return "Session data importing";
+  if (coverage.unavailable > 0) return "Provider has no session detail";
+  if (fixture.status === "scheduled") return `${coverage.total} sessions scheduled`;
+  return "Weekend summary available";
 }
