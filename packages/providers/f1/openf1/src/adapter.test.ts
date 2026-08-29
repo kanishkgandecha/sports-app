@@ -214,6 +214,23 @@ describe("OpenF1Adapter — F1-specific behavior, offline via FixtureOpenF1Clien
     );
     expect(calls).not.toContain("/position");
   });
+
+  it("builds focused historical analysis using only results, laps, and stints", async () => {
+    const calls: string[] = [];
+    const client: OpenF1HttpClient = {
+      async get<T>(path: string): Promise<T[]> {
+        calls.push(path);
+        return new FixtureOpenF1Client().get<T>(path);
+      },
+    };
+
+    const analysis = await new OpenF1Adapter({ client }).getHistoricalSessionAnalysis("f1-session-9574");
+
+    expect(analysis.classifications).toHaveLength(1);
+    expect(analysis.laps.length).toBeGreaterThan(0);
+    expect(analysis.stints.length).toBeGreaterThan(0);
+    expect(calls).toEqual(["/session_result", "/laps", "/stints"]);
+  });
 });
 
 describe("OpenF1Adapter — error handling passthrough", () => {

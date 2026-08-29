@@ -48,7 +48,7 @@ export async function buildApp(databaseUrl: string) {
   await app.register(educationRoutes);
   await app.register(f1Routes);
   await app.register(archiveRoutes);
-  await app.register((instance) => liveRoutes(instance, bus));
+  await app.register((instance) => liveRoutes(instance, bus, config.corsOrigins));
 
   app.addHook("onClose", async () => {
     await bus.close();

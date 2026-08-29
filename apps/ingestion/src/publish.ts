@@ -3,8 +3,8 @@ import type { LiveEvent, SequencedLiveEvent } from "@sports/domain";
 
 /**
  * Writes a LiveEvent and notifies the API tier via Postgres NOTIFY, in one
- * place, so every ingestion job (synthetic, F1, and future sports)
- * publishes the same way — see ARCHITECTURE.md §4.
+ * place, so every F1 ingestion path publishes the same way — see
+ * ARCHITECTURE.md §4.
  *
  * Idempotent by construction (changed at Checkpoint 4 — docs/CONTEXT.md §9
  * "Idempotency"): real providers' adapters build deterministic ids (e.g.

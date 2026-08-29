@@ -168,6 +168,16 @@ describe("syncF1Standings (integration, real Postgres)", () => {
     expect(driverRow?.position).toBe(2);
   });
 
+  it("removes stale identities that are absent from the provider's complete snapshot", async () => {
+    const provider = new TestStandingsProvider();
+    await syncF1Standings(provider, { seasonLabels: ["2099"] });
+    provider.standingsToReturn = standings.filter((row) => row.entityType === "player");
+    await syncF1Standings(provider, { seasonLabels: ["2099"] });
+
+    const rows = await prisma.standing.findMany({ where: { seasonId: season.id } });
+    expect(rows.map((row) => row.entityType)).toEqual(["player"]);
+  });
+
   it("skips a season that hasn't been bootstrapped yet, without throwing", async () => {
     const provider = new TestStandingsProvider();
     const summary = await syncF1Standings(provider, { seasonLabels: ["1900-not-bootstrapped"] });

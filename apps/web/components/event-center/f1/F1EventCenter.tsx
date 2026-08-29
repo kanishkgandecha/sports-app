@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveSession } from "../../../lib/hooks/useLiveSession";
 import {
@@ -19,6 +20,7 @@ import { TimingTower } from "./TimingTower";
 import { RaceControlFeed } from "./RaceControlFeed";
 import { PitStopList } from "./PitStopList";
 import { StandingsPanel } from "./StandingsPanel";
+import { SessionAnalysis } from "./SessionAnalysis";
 import styles from "./f1EventCenter.module.css";
 
 interface ListState<T> {
@@ -33,8 +35,10 @@ const IDLE_LIST: ListState<never> = { items: [], loading: true, error: false };
 function pickInitialSession(sessions: F1Session[]): F1Session | undefined {
   const live = sessions.find((s) => s.lifecycle === "live");
   if (live) return live;
-  const completed = [...sessions].reverse().find((s) => s.lifecycle === "completed");
+  const completed = [...sessions].reverse().find((s) => s.lifecycle === "completed" && s.detailAvailable);
   if (completed) return completed;
+  const summarized = [...sessions].reverse().find((s) => s.lifecycle === "completed");
+  if (summarized) return summarized;
   const upcoming = sessions.find((s) => s.lifecycle === "upcoming");
   return upcoming ?? sessions[0];
 }
@@ -47,13 +51,21 @@ const REFETCH_DEBOUNCE_MS = 400;
  * order and weight (§2's information hierarchy; see f1EventCenter.module.css
  * for how the timing tower dominates the layout).
  */
-export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessions: F1Session[] }) {
-  const availableSessions = useMemo(
-    () => sessions.filter((session) => session.detailAvailable || session.lifecycle === "live"),
-    [sessions],
-  );
+export function F1EventCenter({
+  fixture,
+  sessions,
+  initialSessionId,
+}: {
+  fixture: F1Fixture;
+  sessions: F1Session[];
+  initialSessionId?: string;
+}) {
+  const availableSessions = useMemo(() => sessions, [sessions]);
   const [activeSessionId, setActiveSessionId] = useState(
-    () => pickInitialSession(availableSessions)?.id ?? availableSessions[0]?.id,
+    () =>
+      availableSessions.find((session) => session.id === initialSessionId)?.id ??
+      pickInitialSession(availableSessions)?.id ??
+      availableSessions[0]?.id,
   );
   const activeSession = availableSessions.find((s) => s.id === activeSessionId);
 
@@ -99,8 +111,15 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
     setRaceControl(IDLE_LIST);
     setPitStops(IDLE_LIST);
     setInitialFreshnessAt(null);
+    const selected = availableSessions.find((session) => session.id === activeSessionId);
+    if (selected && !selected.detailAvailable && selected.lifecycle !== "live") {
+      setTiming({ items: [], loading: false, error: false });
+      setRaceControl({ items: [], loading: false, error: false });
+      setPitStops({ items: [], loading: false, error: false });
+      return;
+    }
     void loadAll(activeSessionId);
-  }, [activeSessionId, loadAll]);
+  }, [activeSessionId, availableSessions, loadAll]);
 
   // Coalesces bursts of LiveEvents (a single poll tick can produce many)
   // into one refetch shortly after they stop arriving, rather than
@@ -127,12 +146,24 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
   });
 
   if (!activeSession) {
-    return <p style={{ color: "var(--color-text-faint)" }}>This fixture has no sessions yet.</p>;
+    return <p className={styles.noSessions}>This fixture has no sessions yet.</p>;
+  }
+
+  function selectSession(sessionId: string) {
+    setActiveSessionId(sessionId);
+    const params = new URLSearchParams(window.location.search);
+    params.set("session", sessionId);
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}${window.location.hash}`);
   }
 
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
+        <div className={styles.breadcrumb} aria-label="Breadcrumb">
+          <Link href="/archive">Archive</Link>
+          <span aria-hidden="true">/</span>
+          <span>{new Date(fixture.startTime).getFullYear()}</span>
+        </div>
         <div className={styles.headerTop}>
           <div>
             <h1 className={styles.fixtureName}>{fixture.name}</h1>
@@ -146,43 +177,72 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
         </div>
         <div className={styles.statusRow}>
           <span className={styles.sessionLabel}>{activeSession.type.replace(/_/g, " ")}</span>
+          <span className={styles.sessionCount}>
+            {availableSessions.length} {availableSessions.length === 1 ? "session" : "sessions"}
+          </span>
           <FreshnessIndicator state={freshness.state} updatedAt={freshness.updatedAt ?? new Date().toISOString()} />
         </div>
-        <SessionSelector
-          sessions={availableSessions}
-          activeSessionId={activeSession.id}
-          onSelect={setActiveSessionId}
-        />
+        <SessionSelector sessions={availableSessions} activeSessionId={activeSession.id} onSelect={selectSession} />
       </header>
 
-      <div className={styles.mainGrid}>
-        <section className={styles.section} aria-label="Timing">
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Timing</h2>
+      <div
+        id={`session-panel-${activeSession.id}`}
+        className={styles.sessionPanel}
+        role="tabpanel"
+        aria-labelledby={`session-tab-${activeSession.id}`}
+        tabIndex={0}
+      >
+        {!activeSession.detailAvailable && activeSession.lifecycle !== "live" && (
+          <div className={styles.coverageNotice} role="status">
+            <strong>
+              {activeSession.lifecycle === "upcoming"
+                ? "Scheduled session"
+                : detailStatusLabel(activeSession.detailStatus)}
+            </strong>
+            <span>
+              {activeSession.lifecycle === "upcoming"
+                ? "Detailed timing will appear when this session begins."
+                : (activeSession.detailReason ??
+                  "The calendar and session summary are available, but detailed timing has not been imported yet.")}
+            </span>
           </div>
-          <TimingTower rows={timing.items} loading={timing.loading} error={timing.error} />
-        </section>
+        )}
 
-        <div className={styles.sidebar}>
-          <section className={styles.section} aria-label="Race control">
-            <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>Race control</h2>
-            </div>
-            <RaceControlFeed
-              messages={raceControl.items}
-              loading={raceControl.loading}
-              error={raceControl.error}
-              onExplain={setEducationSlug}
-            />
-          </section>
+        {(activeSession.detailAvailable || activeSession.lifecycle === "live") && (
+          <div className={styles.mainGrid}>
+            <section className={styles.section} aria-label="Timing">
+              <div className={styles.sectionHeader}>
+                <h2 className={styles.sectionTitle}>Timing</h2>
+              </div>
+              <TimingTower rows={timing.items} loading={timing.loading} error={timing.error} />
+            </section>
 
-          <section className={styles.section} aria-label="Pit stops">
-            <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>Pit stops</h2>
+            <div className={styles.sidebar}>
+              <section className={styles.section} aria-label="Race control">
+                <div className={styles.sectionHeader}>
+                  <h2 className={styles.sectionTitle}>Race control</h2>
+                </div>
+                <RaceControlFeed
+                  messages={raceControl.items}
+                  loading={raceControl.loading}
+                  error={raceControl.error}
+                  onExplain={setEducationSlug}
+                />
+              </section>
+
+              <section className={styles.section} aria-label="Pit stops">
+                <div className={styles.sectionHeader}>
+                  <h2 className={styles.sectionTitle}>Pit stops</h2>
+                </div>
+                <PitStopList stops={pitStops.items} loading={pitStops.loading} error={pitStops.error} />
+              </section>
             </div>
-            <PitStopList stops={pitStops.items} loading={pitStops.loading} error={pitStops.error} />
-          </section>
-        </div>
+          </div>
+        )}
+
+        {activeSession.lifecycle === "completed" && activeSession.detailAvailable && (
+          <SessionAnalysis sessionId={activeSession.id} sessionType={activeSession.type} />
+        )}
       </div>
 
       {/* Season-scoped, not session-scoped — see StandingsPanel's doc
@@ -195,4 +255,11 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
       )}
     </div>
   );
+}
+
+function detailStatusLabel(status: F1Session["detailStatus"]) {
+  if (status === "upstream-unavailable") return "Historical detail unavailable from OpenF1";
+  if (status === "failed") return "Historical import will retry";
+  if (status === "importing") return "Historical detail is importing";
+  return "Session summary available";
 }

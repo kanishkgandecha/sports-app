@@ -8,6 +8,7 @@ html,
 body {
   padding: 0;
   margin: 0;
+  overflow-x: clip;
 }
 
 body {
@@ -40,12 +41,32 @@ a {
   border-radius: var(--radius-sm);
 }
 
+.skip-link {
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--control-radius);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-weight: 700;
+  transform: translateY(calc(-100% - var(--space-5)));
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 /* Every page's top-level content wrapper — was inline styles on <main> in
    layout.tsx before Checkpoint 7; moved to a real class so page-specific
    layouts (e.g. /sports/f1's full-bleed hero) can opt out of the max-width
    constraint locally instead of every page being forced through it. */
 .page-shell {
-  max-width: 960px;
+  width: 100%;
+  max-width: var(--content-wide-max-width);
+  min-width: 0;
   margin: 0 auto;
   padding: var(--space-7) var(--space-6);
   display: flex;

@@ -16,11 +16,40 @@
 /* ---- header --------------------------------------------------------- */
 
 .header {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: radial-gradient(60% 130% at 100% 0%, var(--color-accent-soft), transparent 70%), var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-faint);
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.breadcrumb a {
+  color: var(--color-accent-strong);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--duration-fast) var(--ease-standard);
+}
+
+.breadcrumb a:hover {
+  text-decoration-color: currentColor;
 }
 
 .headerTop {
@@ -57,6 +86,11 @@
   color: var(--color-text-faint);
 }
 
+.sessionCount {
+  color: var(--color-text-faint);
+  font-size: var(--font-size-xs);
+}
+
 /* ---- session selector ------------------------------------------------ */
 
 .sessionTabs {
@@ -69,6 +103,12 @@
 
 .sessionTab {
   flex: 0 0 auto;
+  min-width: 112px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
   font-family: var(--font-data);
   font-size: var(--font-size-xs);
   font-weight: 700;
@@ -79,10 +119,28 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
   cursor: pointer;
+  min-height: var(--control-compact-min-height);
   transition:
     background var(--duration-fast) var(--ease-standard),
     color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard);
+}
+
+.sessionTabLabel {
+  color: inherit;
+}
+
+.sessionTabStatus {
+  color: var(--color-text-faint);
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.sessionTab[data-lifecycle="live"] .sessionTabStatus {
+  color: var(--color-live);
 }
 
 .sessionTab:hover {
@@ -101,9 +159,36 @@
   color: var(--color-bg);
 }
 
+.sessionTabActive .sessionTabStatus {
+  color: color-mix(in srgb, var(--color-bg) 76%, transparent);
+}
+
 .sessionTabActive:hover {
   color: var(--color-bg);
   border-color: var(--color-text);
+}
+
+.coverageNotice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.sessionPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.coverageNotice strong {
+  color: var(--color-text);
 }
 
 /* ---- main layout ------------------------------------------------------ */
@@ -156,8 +241,29 @@
 
 .timingScroll {
   overflow-x: auto;
+  scrollbar-gutter: stable;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+}
+
+.scrollHint {
+  display: none;
+  margin: 0;
+  color: var(--color-text-faint);
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .timingTable {
@@ -250,19 +356,19 @@
    negative stay untouched). This is what "sport-specific visual identity
    in the skin layer" (design principle §15) means concretely. */
 .tyreSoft {
-  color: #e10600;
+  color: var(--tyre-soft);
 }
 .tyreMedium {
-  color: #ffb800;
+  color: var(--tyre-medium);
 }
 .tyreHard {
-  color: var(--color-text);
+  color: var(--tyre-hard);
 }
 .tyreIntermediate {
-  color: #2f9e44;
+  color: var(--tyre-intermediate);
 }
 .tyreWet {
-  color: #1c7ed6;
+  color: var(--tyre-wet);
 }
 
 /* Position-change flash — respects prefers-reduced-motion via the token
@@ -316,6 +422,7 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
   cursor: pointer;
+  min-height: var(--control-compact-min-height);
   transition:
     background var(--duration-fast) var(--ease-standard),
     color var(--duration-fast) var(--ease-standard),
@@ -349,6 +456,212 @@
 
 .winsCell {
   color: var(--color-text-faint);
+}
+
+/* ---- completed-session analysis --------------------------------------- */
+
+.analysisSection {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(145deg, var(--color-surface), var(--color-surface-2));
+  box-shadow: var(--shadow-sm);
+}
+
+.analysisTitle {
+  font-size: var(--font-size-lg);
+}
+
+.analysisSubtitle,
+.analysisNote {
+  color: var(--color-text-faint);
+  font-size: var(--font-size-xs);
+}
+
+.analysisSubtitle {
+  margin-top: var(--space-1);
+  font-family: var(--font-data);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.analysisTabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.analysisTab {
+  min-height: var(--control-compact-min-height);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.analysisTab:hover {
+  color: var(--color-text);
+}
+
+.analysisTab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.analysisTabActive {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.analysisScroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.analysisTable {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-family: var(--font-data);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.analysisTable th {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2);
+  color: var(--color-text-faint);
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.analysisTable td {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.analysisTable tbody tr:hover {
+  background: var(--color-surface-2);
+}
+
+.pacePanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.paceControls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.paceControls label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.paceControls select {
+  min-height: var(--control-compact-min-height);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.paceControls select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.fastestLap {
+  color: var(--color-accent-strong);
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.pitOut {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: 9px;
+}
+
+.strategyList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-border);
+}
+
+.strategyRow {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  background: var(--color-surface);
+}
+
+.stintSequence {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+}
+
+.stintCard {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: var(--space-2);
+  min-width: 128px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  font-size: var(--font-size-xs);
+}
+
+.stintCard span:not(.compoundDot),
+.stintCard small {
+  grid-column: 1 / -1;
+  color: var(--color-text-faint);
+}
+
+.compoundDot {
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
 }
 
 /* ---- race control ------------------------------------------------------ */
@@ -409,6 +722,13 @@
 
 /* ---- pit stops ---------------------------------------------------------- */
 
+.pitScroll {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
 .pitTable {
   width: 100%;
   border-collapse: collapse;
@@ -417,11 +737,15 @@
 }
 
 .pitTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   text-align: left;
   font-size: var(--font-size-xs);
   color: var(--color-text-faint);
   font-weight: 600;
   padding: var(--space-1) var(--space-2);
+  background: var(--color-surface-2);
 }
 
 .pitTable td {
@@ -434,12 +758,48 @@
 /* ---- responsive: mobile ---------------------------------------------------- */
 
 @media (max-width: 640px) {
+  .header {
+    padding: var(--space-4);
+  }
+
   .fixtureName {
     font-size: var(--font-size-xl);
   }
 
   .timingTable {
     font-size: var(--font-size-xs);
+  }
+
+  .scrollHint {
+    display: block;
+  }
+
+  .timingPositionCell,
+  .timingDriverCell {
+    position: sticky;
+    background: var(--color-surface);
+  }
+
+  .timingPositionCell {
+    left: 0;
+    z-index: 2;
+  }
+
+  .timingDriverCell {
+    left: 44px;
+    z-index: 2;
+    box-shadow: 1px 0 0 var(--color-border);
+  }
+
+  .timingTable thead .timingPositionCell,
+  .timingTable thead .timingDriverCell {
+    z-index: 3;
+    background: var(--color-surface-2);
+  }
+
+  .timingRow:hover .timingPositionCell,
+  .timingRow:hover .timingDriverCell {
+    background: var(--color-surface-2);
   }
 
   .driverFullName {
@@ -452,9 +812,31 @@
      Desktop keeps the denser padding (§ "dense but readable" — a mouse
      pointer doesn't need this). */
   .sessionTab,
-  .standingsToggleButton {
-    min-height: 44px;
+  .standingsToggleButton,
+  .analysisTab,
+  .paceControls select {
+    min-height: var(--control-min-height);
     display: inline-flex;
-    align-items: center;
   }
+
+  .sessionTab {
+    align-items: flex-start;
+  }
+
+  .analysisSection {
+    padding: var(--space-4);
+  }
+
+  .strategyRow {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+}
+
+/* Phase 5 — was an inline `style` prop; the strict CSP style-src (no
+   unsafe-inline) blocks inline style attributes, and this value is a
+   static design token, so a plain class is the correct fix (see
+   TeamColorDot.tsx's doc comment for the genuinely-dynamic case). */
+.noSessions {
+  color: var(--color-text-faint);
 }

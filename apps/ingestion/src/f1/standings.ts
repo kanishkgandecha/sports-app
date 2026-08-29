@@ -96,6 +96,23 @@ export async function syncF1Standings(
       });
       summary.standingsWritten += 1;
     }
+    // Standings are complete season snapshots. Remove identities no longer
+    // returned by the provider so corrected cross-provider mappings (and
+    // genuine roster changes) cannot leave duplicate/stale rows behind.
+    if (standings.length > 0) {
+      for (const entityType of ["player", "team"] as const) {
+        const currentIds = standings
+          .filter((standing) => standing.entityType === entityType)
+          .map((standing) => standing.entityId);
+        await prisma.standing.deleteMany({
+          where: {
+            seasonId: season.id,
+            entityType,
+            ...(currentIds.length > 0 ? { entityId: { notIn: currentIds } } : {}),
+          },
+        });
+      }
+    }
     summary.seasonsSynced += 1;
   }
 

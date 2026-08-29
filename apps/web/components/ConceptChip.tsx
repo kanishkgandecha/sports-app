@@ -37,7 +37,7 @@ export function ConceptChip({ slug, label }: { slug: string; label: string }) {
   }
 
   return (
-    <span style={{ display: "inline-flex", flexDirection: "column", gap: "var(--space-2)" }}>
+    <span className={styles.wrapper}>
       <button
         type="button"
         onClick={handleToggle}

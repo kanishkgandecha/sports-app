@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@sports/db";
 import { classifySessionLifecycle, computeFreshness, type FreshnessInfo } from "@sports/domain";
+import { deriveF1FixtureStatus } from "./f1Lifecycle.js";
 
 /**
  * F1 read endpoints for the Event Center (Checkpoint 5 — docs/CONTEXT.md
@@ -25,19 +26,30 @@ export async function f1Routes(app: FastifyInstance) {
         return reply.code(400).send({ error: "order must be asc or desc" });
       const order: "asc" | "desc" = req.query.order === "asc" ? "asc" : "desc";
       const fixtures = await prisma.fixture.findMany({
-        where: { sport: { slug: "f1" }, ...(req.query.status ? { status: req.query.status } : {}) },
+        where: { sport: { slug: "f1" } },
         orderBy: { startTime: order },
-        take: limit,
-        include: { venue: true, sessions: { select: { id: true } } },
+        ...(req.query.status ? {} : { take: limit }),
+        include: {
+          venue: true,
+          sessions: {
+            select: { id: true, startTime: true, endTime: true, dataProfile: { select: { status: true } } },
+          },
+        },
       });
       const detailIds = await detailedF1SessionIds(fixtures.flatMap((fixture) => fixture.sessions.map((s) => s.id)));
       return {
-        fixtures: fixtures.map((fixture) =>
-          toFixtureSummary(
-            fixture,
-            fixture.sessions.some((session) => detailIds.has(session.id)),
-          ),
-        ),
+        fixtures: fixtures
+          .map((fixture) =>
+            toFixtureSummary(
+              fixture,
+              fixture.sessions.some(
+                (session) => session.dataProfile?.status === "available" || detailIds.has(session.id),
+              ),
+              deriveF1FixtureStatus(fixture),
+            ),
+          )
+          .filter((fixture) => !req.query.status || fixture.status === req.query.status)
+          .slice(0, limit),
       };
     },
   );
@@ -45,7 +57,7 @@ export async function f1Routes(app: FastifyInstance) {
   app.get<{ Params: { fixtureId: string } }>("/api/f1/fixtures/:fixtureId", async (req, reply) => {
     const fixture = await prisma.fixture.findFirst({
       where: { id: req.params.fixtureId, sport: { slug: "f1" } },
-      include: { venue: true, sessions: { orderBy: { startTime: "asc" } } },
+      include: { venue: true, sessions: { orderBy: { startTime: "asc" }, include: { dataProfile: true } } },
     });
     if (!fixture) {
       // Also correctly 404s for a real fixture id belonging to a different
@@ -56,16 +68,24 @@ export async function f1Routes(app: FastifyInstance) {
     return {
       fixture: toFixtureSummary(
         fixture,
-        fixture.sessions.some((session) => detailIds.has(session.id)),
+        fixture.sessions.some((session) => session.dataProfile?.status === "available" || detailIds.has(session.id)),
+        deriveF1FixtureStatus(fixture),
       ),
-      sessions: fixture.sessions.map((session) => toSessionSummary(session, detailIds.has(session.id))),
+      sessions: fixture.sessions.map((session) =>
+        toSessionSummary(session, session.dataProfile?.status === "available" || detailIds.has(session.id)),
+      ),
     };
   });
 
   app.get<{ Params: { sessionId: string } }>("/api/f1/sessions/:sessionId", async (req, reply) => {
     const session = await prisma.session.findUnique({
       where: { id: req.params.sessionId },
-      include: { fixture: { include: { venue: true } } },
+      include: {
+        dataProfile: true,
+        fixture: {
+          include: { venue: true, sessions: { select: { startTime: true, endTime: true } } },
+        },
+      },
     });
     if (!session) {
       return reply.code(404).send({ error: `No session "${req.params.sessionId}"` });
@@ -74,8 +94,8 @@ export async function f1Routes(app: FastifyInstance) {
     const freshness = await getSessionFreshness(session.id, isLive);
     const detailIds = await detailedF1SessionIds([session.id]);
     return {
-      session: toSessionSummary(session, detailIds.has(session.id)),
-      fixture: toFixtureSummary(session.fixture, detailIds.has(session.id)),
+      session: toSessionSummary(session, session.dataProfile?.status === "available" || detailIds.has(session.id)),
+      fixture: toFixtureSummary(session.fixture, detailIds.has(session.id), deriveF1FixtureStatus(session.fixture)),
       freshness,
     };
   });
@@ -110,6 +130,89 @@ export async function f1Routes(app: FastifyInstance) {
         state: row.state,
       })),
       freshness,
+    };
+  });
+
+  app.get<{ Params: { sessionId: string } }>("/api/f1/sessions/:sessionId/results", async (req, reply) => {
+    const session = await prisma.session.findUnique({ where: { id: req.params.sessionId } });
+    if (!session) return reply.code(404).send({ error: `No session "${req.params.sessionId}"` });
+
+    const rows = await prisma.sessionClassification.findMany({ where: { sessionId: req.params.sessionId } });
+    rows.sort((a, b) => (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER));
+    const drivers = await driversById(rows.map((row) => row.driverId));
+    return {
+      results: rows.map((row) => ({
+        position: row.position,
+        driver: drivers.get(row.driverId) ?? unknownDriver(row.driverId),
+        status: row.status,
+        lapsCompleted: row.lapsCompleted,
+        points: row.points,
+        durationSeconds: row.durationSeconds,
+        gapToLeader: row.gapToLeader,
+        phases: [
+          { duration: row.phase1Duration, gap: row.phase1Gap },
+          { duration: row.phase2Duration, gap: row.phase2Gap },
+          { duration: row.phase3Duration, gap: row.phase3Gap },
+        ],
+      })),
+    };
+  });
+
+  app.get<{ Params: { sessionId: string }; Querystring: { driverId?: string; limit?: string } }>(
+    "/api/f1/sessions/:sessionId/laps",
+    async (req, reply) => {
+      const session = await prisma.session.findUnique({ where: { id: req.params.sessionId } });
+      if (!session) return reply.code(404).send({ error: `No session "${req.params.sessionId}"` });
+      const limit = req.query.limit === undefined ? 2_000 : Number(req.query.limit);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 2_000)
+        return reply.code(400).send({ error: "limit must be from 1 to 2000" });
+
+      const rows = await prisma.lap.findMany({
+        where: { sessionId: req.params.sessionId, ...(req.query.driverId ? { driverId: req.query.driverId } : {}) },
+        orderBy: [{ driverId: "asc" }, { lapNumber: "asc" }],
+        take: limit + 1,
+      });
+      const pageRows = rows.slice(0, limit);
+      const drivers = await driversById(pageRows.map((row) => row.driverId));
+      return {
+        laps: pageRows.map((row) => ({
+          id: row.id,
+          driver: drivers.get(row.driverId) ?? unknownDriver(row.driverId),
+          lapNumber: row.lapNumber,
+          startedAt: row.startedAt?.toISOString() ?? null,
+          duration: row.duration,
+          sector1: row.sector1,
+          sector2: row.sector2,
+          sector3: row.sector3,
+          speedI1: row.speedI1,
+          speedI2: row.speedI2,
+          speedTrap: row.speedTrap,
+          isPitOutLap: row.isPitOutLap,
+        })),
+        truncated: rows.length > limit,
+      };
+    },
+  );
+
+  app.get<{ Params: { sessionId: string } }>("/api/f1/sessions/:sessionId/stints", async (req, reply) => {
+    const session = await prisma.session.findUnique({ where: { id: req.params.sessionId } });
+    if (!session) return reply.code(404).send({ error: `No session "${req.params.sessionId}"` });
+
+    const rows = await prisma.tyreStint.findMany({
+      where: { sessionId: req.params.sessionId },
+      orderBy: [{ driverId: "asc" }, { stintNumber: "asc" }],
+    });
+    const drivers = await driversById(rows.map((row) => row.driverId));
+    return {
+      stints: rows.map((row) => ({
+        id: row.id,
+        driver: drivers.get(row.driverId) ?? unknownDriver(row.driverId),
+        stintNumber: row.stintNumber,
+        lapStart: row.lapStart,
+        lapEnd: row.lapEnd,
+        compound: row.compound,
+        tyreAgeAtStart: row.tyreAgeAtStart,
+      })),
     };
   });
 
@@ -173,14 +276,19 @@ export async function f1Routes(app: FastifyInstance) {
     return {
       season: { year: season.label, id: season.id },
       standings: rows.map((row) => {
-        const driver = drivers.get(row.entityId) ?? unknownDriver(row.entityId);
+        const driver = drivers.get(row.entityId) ?? standingDriver(row.entityId, row.extra);
         const teamId = extraTeamId(row.extra);
         return {
           position: row.position,
           points: row.points,
           wins: extraWins(row.extra),
           driver: { id: driver.id, name: driver.name, shortName: driver.shortName, avatarUrl: driver.avatarUrl },
-          team: (teamId ? teams.get(teamId) : undefined) ?? driver.team ?? null,
+          team:
+            (teamId ? teams.get(teamId) : undefined) ??
+            driver.team ??
+            (teamId && extraString(row.extra, "teamName")
+              ? { id: teamId, name: extraString(row.extra, "teamName")!, colorHex: null }
+              : null),
         };
       }),
     };
@@ -204,7 +312,11 @@ export async function f1Routes(app: FastifyInstance) {
         position: row.position,
         points: row.points,
         wins: extraWins(row.extra),
-        team: teams.get(row.entityId) ?? { id: row.entityId, name: row.entityId, colorHex: null },
+        team: teams.get(row.entityId) ?? {
+          id: row.entityId,
+          name: extraString(row.extra, "teamName") ?? row.entityId,
+          colorHex: null,
+        },
       })),
     };
   });
@@ -283,6 +395,20 @@ function extraTeamId(extra: unknown): string | null {
   return typeof teamId === "string" ? teamId : null;
 }
 
+function extraString(extra: unknown, key: string): string | null {
+  if (typeof extra !== "object" || extra === null || !(key in extra)) return null;
+  const value = (extra as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+function standingDriver(driverId: string, extra: unknown) {
+  return {
+    ...unknownDriver(driverId),
+    name: extraString(extra, "driverName") ?? driverId,
+    shortName: extraString(extra, "driverCode"),
+  };
+}
+
 async function driversById(driverIds: string[]) {
   const unique = [...new Set(driverIds)];
   const players = await prisma.player.findMany({
@@ -318,12 +444,13 @@ function toFixtureSummary(
     venue: { id: string; name: string; country: string; timezone: string } | null;
   },
   detailAvailable = false,
+  status = fixture.status,
 ) {
   return {
     id: fixture.id,
     slug: fixture.slug,
     name: fixture.name,
-    status: fixture.status,
+    status,
     startTime: fixture.startTime.toISOString(),
     venue: fixture.venue,
     detailAvailable,
@@ -337,6 +464,7 @@ function toSessionSummary(
     status: string;
     startTime: Date;
     endTime: Date | null;
+    dataProfile?: { status: string; reason: string | null; nextRetryAt: Date | null } | null;
   },
   detailAvailable = false,
 ) {
@@ -351,6 +479,9 @@ function toSessionSummary(
     startTime: session.startTime.toISOString(),
     endTime: session.endTime ? session.endTime.toISOString() : null,
     detailAvailable,
+    detailStatus: detailAvailable ? "available" : (session.dataProfile?.status ?? "summary"),
+    detailReason: session.dataProfile?.reason ?? null,
+    nextRetryAt: session.dataProfile?.nextRetryAt?.toISOString() ?? null,
   };
 }
 

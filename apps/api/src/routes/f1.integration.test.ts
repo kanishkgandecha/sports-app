@@ -92,6 +92,17 @@ async function seed() {
       endTime: new Date("2020-01-01T02:00:00Z"),
     },
   });
+  await prisma.sessionDataProfile.upsert({
+    where: { sessionId: SESSION_ID },
+    update: { status: "available", reason: null },
+    create: {
+      sessionId: SESSION_ID,
+      source: "openf1",
+      status: "available",
+      attemptCount: 1,
+      importedAt: new Date("2020-01-01T02:01:00Z"),
+    },
+  });
   // A currently-live session — used for freshness/lifecycle assertions.
   await prisma.session.upsert({
     where: { id: LIVE_SESSION_ID },
@@ -179,6 +190,55 @@ async function seed() {
       lap: 12,
       durationMs: 23500,
       timestamp: new Date("2020-01-01T00:45:00Z"),
+    },
+  });
+
+  await prisma.sessionClassification.upsert({
+    where: { sessionId_driverId: { sessionId: SESSION_ID, driverId: DRIVER_ID } },
+    update: {},
+    create: {
+      id: "api-test-result-1",
+      sessionId: SESSION_ID,
+      driverId: DRIVER_ID,
+      position: 1,
+      status: "classified",
+      lapsCompleted: 44,
+      points: 25,
+      durationSeconds: 4930.2,
+      gapToLeader: "0.000",
+    },
+  });
+  await prisma.lap.upsert({
+    where: { sessionId_driverId_lapNumber: { sessionId: SESSION_ID, driverId: DRIVER_ID, lapNumber: 5 } },
+    update: {},
+    create: {
+      id: "api-test-lap-1",
+      sessionId: SESSION_ID,
+      driverId: DRIVER_ID,
+      lapNumber: 5,
+      startedAt: new Date("2020-01-01T00:10:00Z"),
+      duration: 87.5,
+      sector1: 28.1,
+      sector2: 29.2,
+      sector3: 30.2,
+      speedI1: 250,
+      speedI2: 270,
+      speedTrap: 310,
+      isPitOutLap: false,
+    },
+  });
+  await prisma.tyreStint.upsert({
+    where: { sessionId_driverId_stintNumber: { sessionId: SESSION_ID, driverId: DRIVER_ID, stintNumber: 1 } },
+    update: {},
+    create: {
+      id: "api-test-stint-1",
+      sessionId: SESSION_ID,
+      driverId: DRIVER_ID,
+      stintNumber: 1,
+      lapStart: 1,
+      lapEnd: 20,
+      compound: "SOFT",
+      tyreAgeAtStart: 0,
     },
   });
 
@@ -301,6 +361,10 @@ async function seedStandings() {
 }
 
 async function cleanup() {
+  if (!process.env.DATABASE_URL) return;
+  await prisma.sessionClassification.deleteMany({ where: { sessionId: { in: [SESSION_ID, LIVE_SESSION_ID] } } });
+  await prisma.lap.deleteMany({ where: { sessionId: { in: [SESSION_ID, LIVE_SESSION_ID] } } });
+  await prisma.tyreStint.deleteMany({ where: { sessionId: { in: [SESSION_ID, LIVE_SESSION_ID] } } });
   await prisma.driverTiming.deleteMany({ where: { sessionId: { in: [SESSION_ID, LIVE_SESSION_ID] } } });
   await prisma.pitStop.deleteMany({ where: { sessionId: { in: [SESSION_ID, LIVE_SESSION_ID] } } });
   await prisma.raceControlMessage.deleteMany({ where: { sessionId: { in: [SESSION_ID, LIVE_SESSION_ID] } } });
@@ -328,7 +392,7 @@ describe("F1 routes (integration, real Postgres)", () => {
     app = await buildApp(process.env.DATABASE_URL!);
   });
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
     await cleanup();
   });
 
@@ -350,8 +414,8 @@ describe("F1 routes (integration, real Postgres)", () => {
     expect(body.sessions.map((s: { id: string }) => s.id)).toEqual([SESSION_ID, LIVE_SESSION_ID]);
     expect(body.fixture.detailAvailable).toBe(true);
     expect(body.sessions).toEqual([
-      expect.objectContaining({ id: SESSION_ID, detailAvailable: true }),
-      expect.objectContaining({ id: LIVE_SESSION_ID, detailAvailable: false }),
+      expect.objectContaining({ id: SESSION_ID, detailAvailable: true, detailStatus: "available" }),
+      expect.objectContaining({ id: LIVE_SESSION_ID, detailAvailable: false, detailStatus: "summary" }),
     ]);
   });
 
@@ -425,8 +489,64 @@ describe("F1 routes (integration, real Postgres)", () => {
     expect(body.pitStops[0]).toMatchObject({ lap: 12, durationMs: 23500, driver: { name: "Test Driver" } });
   });
 
-  it("timing/race-control/pit-stops all 404 for an unknown session", async () => {
-    for (const path of ["timing", "race-control", "pit-stops"]) {
+  it("GET /api/f1/sessions/:sessionId/results returns normalized classifications with driver info", async () => {
+    const res = await app.inject({ method: "GET", url: `/api/f1/sessions/${SESSION_ID}/results` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().results).toEqual([
+      expect.objectContaining({
+        position: 1,
+        driver: expect.objectContaining({ name: "Test Driver", shortName: "TST" }),
+        status: "classified",
+        lapsCompleted: 44,
+        points: 25,
+        durationSeconds: 4930.2,
+        phases: [
+          { duration: null, gap: null },
+          { duration: null, gap: null },
+          { duration: null, gap: null },
+        ],
+      }),
+    ]);
+  });
+
+  it("GET /api/f1/sessions/:sessionId/laps returns normalized lap telemetry and validates limits", async () => {
+    const res = await app.inject({ method: "GET", url: `/api/f1/sessions/${SESSION_ID}/laps?limit=10` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      truncated: false,
+      laps: [
+        {
+          id: "api-test-lap-1",
+          driver: expect.objectContaining({ name: "Test Driver" }),
+          lapNumber: 5,
+          duration: 87.5,
+          speedTrap: 310,
+          isPitOutLap: false,
+        },
+      ],
+    });
+    expect((await app.inject({ method: "GET", url: `/api/f1/sessions/${SESSION_ID}/laps?limit=0` })).statusCode).toBe(
+      400,
+    );
+  });
+
+  it("GET /api/f1/sessions/:sessionId/stints returns tyre strategy boundaries", async () => {
+    const res = await app.inject({ method: "GET", url: `/api/f1/sessions/${SESSION_ID}/stints` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().stints).toEqual([
+      expect.objectContaining({
+        driver: expect.objectContaining({ name: "Test Driver" }),
+        stintNumber: 1,
+        lapStart: 1,
+        lapEnd: 20,
+        compound: "SOFT",
+        tyreAgeAtStart: 0,
+      }),
+    ]);
+  });
+
+  it("session detail and analysis endpoints all 404 for an unknown session", async () => {
+    for (const path of ["timing", "race-control", "pit-stops", "results", "laps", "stints"]) {
       const res = await app.inject({ method: "GET", url: `/api/f1/sessions/does-not-exist/${path}` });
       expect(res.statusCode).toBe(404);
     }

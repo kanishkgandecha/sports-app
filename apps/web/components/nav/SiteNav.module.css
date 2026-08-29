@@ -8,15 +8,22 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
-  padding: var(--space-3) var(--space-6);
+  padding: 0 var(--space-6);
   border-bottom: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-bg) 88%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+.inner {
+  width: 100%;
+  max-width: var(--content-wide-max-width);
+  min-height: var(--nav-height);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
 }
 
 .brand {
@@ -34,10 +41,10 @@
 /* A small mark, not a logo asset — a deliberate geometric shape (not a
    generic circle-in-a-box) that reads at 20px and scales with the type. */
 .brandMark {
-  width: 20px;
-  height: 20px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
   flex: 0 0 auto;
-  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-strong));
+  background: linear-gradient(135deg, var(--color-accent-strong), var(--color-accent));
   clip-path: polygon(0 100%, 0 40%, 60% 0, 100% 0, 100% 60%, 40% 100%);
 }
 
@@ -74,7 +81,7 @@
 
 .linkActive {
   color: var(--color-text);
-  background: var(--color-surface-2);
+  background: var(--color-accent-soft);
 }
 
 /* A real link (not a dead-end) but visually distinct from active/available
@@ -104,7 +111,10 @@
 
 @media (max-width: 640px) {
   .header {
-    padding: var(--space-3) var(--space-4);
+    padding: 0 var(--space-4);
+  }
+  .inner {
+    min-height: var(--nav-height-mobile);
     gap: var(--space-3);
   }
   .brand span:last-child {
@@ -114,6 +124,6 @@
      (docs/CONTEXT.md, Checkpoint 7 §3). Desktop's tighter, mouse-driven
      sizing is unaffected. */
   .link {
-    min-height: 44px;
+    min-height: var(--control-min-height);
   }
 }

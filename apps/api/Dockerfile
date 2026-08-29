@@ -49,6 +49,10 @@ COPY --from=pruner /repo/out/full/ .
 # (found by actually running this build, not by inspection — see
 # docs/CONTEXT.md §11). Copied from the real build context directly.
 COPY tsconfig.base.json ./tsconfig.base.json
+# Education Markdown is runtime data rather than a workspace dependency, so
+# Turbo's package-graph prune cannot discover it. Keep the versioned content in
+# the image explicitly; the runner inherits it through the full builder copy.
+COPY content/education ./content/education
 RUN turbo run build --filter=@sports/api...
 
 # ---- runtime: minimal, non-root -----------------------------------------
@@ -58,6 +62,9 @@ WORKDIR /repo
 COPY --from=builder /repo .
 USER sports
 ENV NODE_ENV=production
+# The container starts from /repo, while local pnpm commands start the API from
+# apps/api. Pin the production path so education loading never depends on cwd.
+ENV CONTENT_ROOT=/repo/content/education
 EXPOSE 4000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
   CMD node -e "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

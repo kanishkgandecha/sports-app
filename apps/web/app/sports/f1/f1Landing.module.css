@@ -16,16 +16,38 @@
   overflow: hidden;
   border-bottom: 1px solid var(--color-border);
   background:
-    radial-gradient(55% 60% at 85% -10%, color-mix(in srgb, var(--color-accent) 14%, transparent), transparent 70%),
+    radial-gradient(55% 70% at 85% -10%, color-mix(in srgb, var(--color-accent) 18%, transparent), transparent 70%),
     var(--color-bg);
 }
 
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 48px,
+    color-mix(in srgb, var(--color-border) 34%, transparent) 48px 49px
+  );
+  mask-image: linear-gradient(to left, black, transparent 58%);
+  pointer-events: none;
+}
+
 .heroInner {
-  max-width: 960px;
+  position: relative;
+  z-index: 1;
+  max-width: var(--content-max-width);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+.heroTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
 }
 
 .kicker {
@@ -47,6 +69,37 @@
   text-transform: uppercase;
   letter-spacing: -0.01em;
   line-height: 1.02;
+  text-wrap: balance;
+}
+
+.heroSummary {
+  max-width: var(--content-measure-wide);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-base);
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.statusPill[data-status="live"] {
+  border-color: var(--color-live);
+  background: var(--color-live-soft);
+  color: var(--color-live);
 }
 
 .heroMeta {
@@ -77,6 +130,13 @@
   letter-spacing: 0.05em;
 }
 
+.heroVenue,
+.emptyCopy {
+  margin: 0;
+  color: var(--color-text-faint);
+  font-size: var(--font-size-sm);
+}
+
 .heroCta {
   display: inline-flex;
   align-items: center;
@@ -84,14 +144,18 @@
   font-family: var(--font-data);
   font-size: var(--font-size-sm);
   font-weight: 700;
-  padding: var(--space-3) var(--space-5);
-  border-radius: var(--radius-md);
-  background: var(--color-text);
-  color: var(--color-bg);
-  transition: transform var(--duration-fast) var(--ease-standard);
+  min-height: var(--control-min-height);
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--control-radius);
+  background: var(--button-primary-bg);
+  color: var(--button-primary-fg);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 
 .heroCta:hover {
+  background: var(--button-primary-bg-hover);
   transform: translateY(-1px);
 }
 
@@ -104,15 +168,21 @@
 /* ---- sessions strip ------------------------------------------------------ */
 
 .sessionStrip {
-  display: flex;
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-2);
-  overflow-x: auto;
-  padding-bottom: 2px;
+}
+
+.sessionStrip > li {
+  min-width: 0;
 }
 
 .sessionCard {
-  flex: 0 0 auto;
-  min-width: 120px;
+  height: 100%;
+  min-height: 106px;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -120,11 +190,33 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.sessionCard:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
 }
 
 .sessionCardLive {
   border-color: var(--color-live);
   background: var(--color-live-soft);
+}
+
+.sessionCardActive {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 3px 0 var(--color-accent);
+}
+
+.sessionCardTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .sessionCardType {
@@ -134,10 +226,25 @@
   letter-spacing: 0.04em;
 }
 
+.sessionCardArrow {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
 .sessionCardTime {
   font-size: var(--font-size-xs);
-  color: var(--color-text-faint);
+  color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.sessionCardState {
+  margin-top: auto;
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* ---- generic section shell ------------------------------------------------ */
@@ -162,6 +269,17 @@
   letter-spacing: -0.01em;
 }
 
+.sectionEyebrow {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--color-text-faint);
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .sectionLink {
   font-size: var(--font-size-sm);
   font-weight: 600;
@@ -181,9 +299,14 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .standingsCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
   background: var(--color-surface-2);
   font-size: var(--font-size-xs);
@@ -252,6 +375,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  min-height: var(--list-row-min-height);
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface);
   transition: background var(--duration-fast) var(--ease-standard);
@@ -303,6 +427,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .learnCardText {
@@ -328,5 +453,37 @@
 @media (max-width: 640px) {
   .title {
     font-size: var(--font-size-3xl);
+  }
+  .hero {
+    padding: var(--space-7) var(--space-4);
+  }
+  .heroMeta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .heroSummary {
+    font-size: var(--font-size-base);
+  }
+  .heroCta {
+    width: 100%;
+    justify-content: center;
+  }
+  .sessionCard {
+    min-height: var(--control-min-height);
+  }
+  .sessionStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sectionHeader {
+    align-items: flex-end;
+  }
+  .fixtureRow {
+    min-height: var(--list-row-min-height-mobile);
+  }
+}
+
+@media (max-width: 400px) {
+  .sessionStrip {
+    grid-template-columns: 1fr;
   }
 }

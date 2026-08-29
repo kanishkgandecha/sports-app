@@ -8,7 +8,8 @@ services:
       POSTGRES_PASSWORD: sports
       POSTGRES_DB: sports_platform_dev
     ports:
-      - "5432:5432"
+      # 5433 avoids colliding with a developer's native PostgreSQL service.
+      - "5433:5432"
     volumes:
       - sports-platform-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -90,6 +91,12 @@ services:
       # Container-to-container origin for server-side (RSC) data fetching —
       # a genuine runtime env var (not NEXT_PUBLIC_), see lib/api.ts.
       API_INTERNAL_URL: http://api:4000
+      # Phase 4 — this app's own public origin, for canonical/Open Graph
+      # URLs and the sitemap (see lib/siteUrl.ts). Matches the host port
+      # this service is published on below, so it's already correct for
+      # this local Compose setup; a real deployment overrides it to the
+      # actual public origin.
+      SITE_URL: http://localhost:3000
     ports:
       - "3000:3000"
     depends_on:

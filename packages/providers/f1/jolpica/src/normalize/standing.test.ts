@@ -25,7 +25,9 @@ describe("normalizeDriverStanding — real 2026 driver standings", () => {
       extra: {
         wins: 6,
         driverCode: "ANT",
+        driverName: "Andrea Kimi Antonelli",
         teamId: "f1-team-mercedes",
+        teamName: "Mercedes",
         constructorHistory: ["f1-team-mercedes"],
       },
     });
@@ -88,7 +90,7 @@ describe("normalizeConstructorStanding — real 2026 constructor standings", () 
       entityId: "f1-team-mercedes",
       points: 379,
       position: 1,
-      extra: { wins: 8, jolpicaConstructorId: "mercedes" },
+      extra: { wins: 8, teamName: "Mercedes", jolpicaConstructorId: "mercedes" },
     });
   });
 

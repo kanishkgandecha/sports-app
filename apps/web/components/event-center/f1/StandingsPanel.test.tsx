@@ -1,7 +1,18 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StandingsPanel } from "./StandingsPanel";
+
+// TeamColorDot (see its doc comment) appends into this shared,
+// already-approved stylesheet rather than an inline style attribute; tests
+// provide it the way the real root layout does.
+let sheetEl: HTMLStyleElement;
+beforeEach(() => {
+  sheetEl = document.createElement("style");
+  sheetEl.id = "dynamic-team-colors";
+  document.head.appendChild(sheetEl);
+});
+afterEach(() => sheetEl.remove());
 
 const driverStandingsBody = {
   season: { year: "2026", id: "f1-season-2026" },
@@ -68,6 +79,42 @@ describe("StandingsPanel", () => {
     expect((fetchImpl as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBeforeSwitch); // both were already fetched up front
   });
 
+  it("connects the active tab to its panel and supports arrow, Home, and End keyboard navigation", async () => {
+    vi.stubGlobal("fetch", mockFetchOk());
+    render(<StandingsPanel year={2026} onExplain={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText("219")).toBeInTheDocument());
+
+    const drivers = screen.getByRole("tab", { name: "Drivers" });
+    const constructors = screen.getByRole("tab", { name: "Constructors" });
+    const panel = screen.getByRole("tabpanel");
+    expect(drivers).toHaveAttribute("aria-controls", panel.id);
+    expect(panel).toHaveAttribute("aria-labelledby", drivers.id);
+    expect(drivers).toHaveAttribute("tabindex", "0");
+    expect(constructors).toHaveAttribute("tabindex", "-1");
+
+    drivers.focus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(constructors).toHaveFocus();
+    expect(constructors).toHaveAttribute("aria-selected", "true");
+    expect(panel).toHaveAttribute("aria-labelledby", constructors.id);
+    expect(screen.getByText("379")).toBeInTheDocument();
+
+    await userEvent.keyboard("{Home}");
+    expect(drivers).toHaveFocus();
+    await userEvent.keyboard("{End}");
+    expect(constructors).toHaveFocus();
+  });
+
+  it("labels each horizontally scrollable standings table as a keyboard-focusable region", async () => {
+    vi.stubGlobal("fetch", mockFetchOk());
+    render(<StandingsPanel year={2026} onExplain={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText("219")).toBeInTheDocument());
+
+    const region = screen.getByRole("region", { name: "Driver championship standings" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(screen.getByText("Driver championship positions, points, and wins")).toBeInTheDocument();
+  });
+
   it("never renders a movement/position-change column — nothing here is truthfully calculable from a single snapshot", async () => {
     vi.stubGlobal("fetch", mockFetchOk());
     render(<StandingsPanel year={2026} onExplain={vi.fn()} />);
@@ -89,6 +136,20 @@ describe("StandingsPanel", () => {
 
     await userEvent.click(screen.getByText(/how are these determined/i));
     expect(onExplain).toHaveBeenCalledWith("championship-points");
+  });
+
+  it("Phase 5 regression: never renders an inline style for the team-color swatch, in either tab, using the shared stylesheet instead", async () => {
+    vi.stubGlobal("fetch", mockFetchOk());
+    const { container } = render(<StandingsPanel year={2026} onExplain={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText("219")).toBeInTheDocument());
+    expect(container.querySelector("[style]")).toBeNull();
+    await waitFor(() => {
+      const rules = Array.from(sheetEl.sheet!.cssRules as unknown as CSSStyleRule[]);
+      expect(rules.some((rule) => rule.style.background === "rgb(39, 244, 210)")).toBe(true);
+    });
+
+    await userEvent.click(screen.getByRole("tab", { name: "Constructors" }));
+    expect(container.querySelector("[style]")).toBeNull();
   });
 
   it("re-fetches when the year prop changes", async () => {

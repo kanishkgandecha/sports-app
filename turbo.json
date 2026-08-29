@@ -15,6 +15,11 @@
     },
     "test": {
       "dependsOn": ["^build"]
+    },
+    "test:integration": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL", "CORS_ORIGINS", "F1_PROVIDER", "F1_STANDINGS_PROVIDER", "NEXT_PUBLIC_API_URL"]
     }
   }
 }

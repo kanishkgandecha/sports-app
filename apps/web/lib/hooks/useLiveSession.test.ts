@@ -81,8 +81,21 @@ describe("useLiveSession", () => {
 
   it("freshness is never LIVE for a session that isn't actually live, even with fresh events arriving", () => {
     const { result } = renderHook(() => useLiveSession("session-1", { isLive: false }));
-    act(() => MockEventSource.instances[0].emit("live-event", { timestamp: new Date().toISOString() }));
+    expect(MockEventSource.instances).toHaveLength(0);
     expect(result.current.freshness.state).toBe("offline");
+    expect(result.current.connectionState).toBe("closed");
+  });
+
+  it("closes a live connection when the session completes", () => {
+    const { rerender } = renderHook(({ isLive }) => useLiveSession("session-1", { isLive }), {
+      initialProps: { isLive: true },
+    });
+    const source = MockEventSource.instances[0];
+
+    act(() => rerender({ isLive: false }));
+
+    expect(source.closed).toBe(true);
+    expect(MockEventSource.instances).toHaveLength(1);
   });
 
   it("freshness becomes LIVE once a fresh event arrives for a live session", () => {

@@ -10,11 +10,43 @@ import {
   type F1Session,
 } from "../../../lib/f1Api";
 import { apiGet } from "../../../lib/api";
-import { formatDate } from "../../../lib/format";
+import { formatDate, formatDateTime } from "../../../lib/format";
 import styles from "./f1Landing.module.css";
 import { Countdown } from "../../../components/Countdown";
+import { TeamColorDot } from "../../../components/TeamColorDot";
+import { buildPageMetadata } from "../../../lib/pageMetadata";
 
-export const metadata: Metadata = { title: "F1 Race Center" };
+/**
+ * Phase 6 — `/` re-exports this exact module (`app/page.tsx`: `export {
+ * metadata, default } from "./sports/f1/page"`), so this one object serves
+ * both routes. `path: "/"` canonicalizes *both* to the root: they render
+ * byte-identical content, and duplicate-content pages should declare the
+ * same canonical target rather than each pointing at itself (matches
+ * events/[id]/page.tsx's own `generateMetadata` convention of one real
+ * canonical per distinct piece of content).
+ *
+ * `title` is deliberately `{ absolute }`, not a plain string: Next's
+ * title-template docs (`node_modules/next/dist/docs/.../generate-
+ * metadata.md`, "Good to know") say a layout's `template` does NOT apply
+ * to a `page.js` *in the same route segment* as that layout — which is
+ * exactly `/` (root layout + root page.tsx = one segment) — but DOES apply
+ * to a genuinely nested segment. `/sports/f1` is a nested segment even
+ * though it shares this literal metadata object with `/`, so a plain
+ * `title: "F1 Race Center"` string here previously rendered as `/`'s title
+ * verbatim ("F1 Race Center") but as `/sports/f1`'s doubled, templated
+ * title ("F1 Race Center — F1 Race Center") — confirmed over curl before
+ * this fix. `absolute` bypasses the template unconditionally, so both
+ * routes render the identical, correct, undoubled title.
+ */
+export const metadata: Metadata = {
+  ...buildPageMetadata({
+    path: "/",
+    title: "F1 Race Center",
+    description:
+      "Live Formula 1 timing, race control, championship standings, results, and the upcoming race calendar.",
+  }),
+  title: { absolute: "F1 Race Center" },
+};
 
 const SESSION_LABEL: Record<string, string> = {
   FP1: "FP1",
@@ -26,16 +58,16 @@ const SESSION_LABEL: Record<string, string> = {
   RACE: "Race",
 };
 
-async function getFixtures(): Promise<F1Fixture[]> {
+async function getFixtures(): Promise<{ fixtures: F1Fixture[]; unavailable: boolean }> {
   try {
     const results = await Promise.all([
       apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures?status=live&limit=5&order=desc"),
       apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures?status=scheduled&limit=8&order=asc"),
       apiGet<{ fixtures: F1Fixture[] }>("/api/f1/fixtures?status=completed&limit=6&order=desc"),
     ]);
-    return results.flatMap((result) => result.fixtures);
+    return { fixtures: results.flatMap((result) => result.fixtures), unavailable: false };
   } catch {
-    return [];
+    return { fixtures: [], unavailable: true };
   }
 }
 
@@ -61,7 +93,8 @@ function pickFeaturedSession(sessions: F1Session[]): F1Session | undefined {
  * literal order without dropping any of its sections.
  */
 export default async function F1LandingPage() {
-  const fixtures = await getFixtures();
+  const fixtureResult = await getFixtures();
+  const fixtures = fixtureResult.fixtures;
 
   const live = fixtures.filter((f) => f.status === "live");
   const upcoming = [...fixtures.filter((f) => f.status === "scheduled")].sort((a, b) =>
@@ -74,6 +107,9 @@ export default async function F1LandingPage() {
   const featuredFixture = live[0] ?? upcoming[0] ?? completed[0];
   const featuredDetail = featuredFixture ? await getF1Fixture(featuredFixture.id).catch(() => null) : null;
   const featuredSession = featuredDetail ? pickFeaturedSession(featuredDetail.sessions) : undefined;
+  const featuredHref = featuredFixture
+    ? `/events/${featuredFixture.id}${featuredSession ? `?session=${featuredSession.id}` : ""}`
+    : "/archive";
 
   const year = new Date().getFullYear();
   const [driverStandingsResult, constructorStandingsResult] = await Promise.allSettled([
@@ -89,10 +125,18 @@ export default async function F1LandingPage() {
     <>
       <section className={styles.hero}>
         <div className={styles.heroInner}>
-          <span className={styles.kicker}>Formula 1 · {year} season</span>
+          <div className={styles.heroTopline}>
+            <span className={styles.kicker}>Formula 1 · {year} season</span>
+            {featuredFixture && (
+              <span className={styles.statusPill} data-status={featuredFixture.status}>
+                {fixtureStatusLabel(featuredFixture.status)}
+              </span>
+            )}
+          </div>
           {featuredFixture ? (
             <>
               <h1 className={styles.title}>{featuredFixture.name}</h1>
+              <p className={styles.heroSummary}>{heroSummary(featuredFixture.status, featuredSession)}</p>
               <div className={styles.heroMeta}>
                 {featuredSession && featuredSession.lifecycle !== "completed" && (
                   <div className={styles.countdown}>
@@ -103,66 +147,78 @@ export default async function F1LandingPage() {
                   </div>
                 )}
                 {featuredFixture.venue && (
-                  <span style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
+                  <span className={styles.heroVenue}>
                     {featuredFixture.venue.name}, {featuredFixture.venue.country}
                   </span>
                 )}
-                {featuredFixture.detailAvailable ? (
-                  <Link href={`/events/${featuredFixture.id}`} className={styles.heroCta}>
-                    Open Event Center →
-                  </Link>
-                ) : (
-                  <span className={styles.heroCta}>Detailed data pending</span>
-                )}
+                <Link href={featuredHref} className={styles.heroCta}>
+                  Open Event Center →
+                </Link>
               </div>
             </>
           ) : (
             <>
               <h1 className={styles.title}>Formula 1</h1>
-              <p style={{ color: "var(--color-text-faint)" }}>
-                No F1 calendar loaded yet — start the ingestion worker (see README).
+              <p className={styles.emptyCopy}>
+                {fixtureResult.unavailable
+                  ? "The F1 calendar is temporarily unavailable. Please try again shortly."
+                  : "No F1 calendar has been imported yet."}
               </p>
             </>
           )}
 
           {featuredDetail && featuredDetail.sessions.length > 0 && (
-            <div className={styles.sessionStrip} role="list" aria-label="This weekend's sessions">
+            <ol className={styles.sessionStrip} aria-label="This weekend's sessions">
               {featuredDetail.sessions.map((session) => (
-                <div
-                  key={session.id}
-                  role="listitem"
-                  className={`${styles.sessionCard} ${session.lifecycle === "live" ? styles.sessionCardLive : ""}`}
-                >
-                  <span className={styles.sessionCardType}>{SESSION_LABEL[session.type] ?? session.type}</span>
-                  <span className={styles.sessionCardTime}>
-                    {session.lifecycle === "live" ? "LIVE" : formatDate(session.startTime)}
-                  </span>
-                </div>
+                <li key={session.id}>
+                  <Link
+                    href={`/events/${featuredFixture.id}?session=${session.id}`}
+                    className={`${styles.sessionCard} ${session.lifecycle === "live" ? styles.sessionCardLive : ""} ${session.id === featuredSession?.id ? styles.sessionCardActive : ""}`}
+                    aria-current={session.id === featuredSession?.id ? "true" : undefined}
+                  >
+                    <span className={styles.sessionCardTopline}>
+                      <span className={styles.sessionCardType}>{SESSION_LABEL[session.type] ?? session.type}</span>
+                      <span className={styles.sessionCardArrow} aria-hidden="true">
+                        →
+                      </span>
+                    </span>
+                    <span className={styles.sessionCardTime}>{formatDateTime(session.startTime)}</span>
+                    <span className={styles.sessionCardState}>{sessionStateLabel(session)}</span>
+                  </Link>
+                </li>
               ))}
-            </div>
+            </ol>
           )}
         </div>
       </section>
 
       <section className={styles.section} aria-label="Championship standings">
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Championship snapshot</h2>
+          <div>
+            <span className={styles.sectionEyebrow}>{year} title race</span>
+            <h2 className={styles.sectionTitle}>Championship snapshot</h2>
+          </div>
         </div>
-        {driverStandings.length === 0 && constructorStandings.length === 0 ? (
-          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
-            No standings synced yet — start the ingestion worker (see README).
-          </p>
+        {(driverStandingsResult.status === "rejected" || constructorStandingsResult.status === "rejected") &&
+        driverStandings.length === 0 &&
+        constructorStandings.length === 0 ? (
+          <p className={styles.emptyCopy}>Championship standings are temporarily unavailable.</p>
+        ) : driverStandings.length === 0 && constructorStandings.length === 0 ? (
+          <p className={styles.emptyCopy}>No championship standings have been imported yet.</p>
         ) : (
           <div className={styles.standingsGrid}>
             <div className={styles.standingsCard}>
-              <div className={styles.standingsCardHeader}>Drivers</div>
+              <div className={styles.standingsCardHeader}>
+                <span>Drivers</span>
+                <span>PTS</span>
+              </div>
               {driverStandings.map((s) => (
                 <div className={styles.standingsRow} key={s.driver.id}>
                   <span className={styles.standingsPos}>{s.position}</span>
-                  <span
+                  <TeamColorDot
+                    id={s.driver.id}
+                    colorHex={s.team?.colorHex ?? null}
                     className={styles.standingsSwatch}
-                    style={{ background: s.team?.colorHex ?? "var(--color-border)" }}
-                    aria-hidden="true"
                   />
                   <span className={styles.standingsName}>{s.driver.shortName ?? s.driver.name}</span>
                   <span className={styles.standingsPoints}>{s.points}</span>
@@ -170,15 +226,14 @@ export default async function F1LandingPage() {
               ))}
             </div>
             <div className={styles.standingsCard}>
-              <div className={styles.standingsCardHeader}>Constructors</div>
+              <div className={styles.standingsCardHeader}>
+                <span>Constructors</span>
+                <span>PTS</span>
+              </div>
               {constructorStandings.map((s) => (
                 <div className={styles.standingsRow} key={s.team.id}>
                   <span className={styles.standingsPos}>{s.position}</span>
-                  <span
-                    className={styles.standingsSwatch}
-                    style={{ background: s.team.colorHex ?? "var(--color-border)" }}
-                    aria-hidden="true"
-                  />
+                  <TeamColorDot id={s.team.id} colorHex={s.team.colorHex} className={styles.standingsSwatch} />
                   <span className={styles.standingsName}>{s.team.name}</span>
                   <span className={styles.standingsPoints}>{s.points}</span>
                 </div>
@@ -190,15 +245,16 @@ export default async function F1LandingPage() {
 
       <section className={styles.section} aria-label="Recent results">
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Recent results</h2>
+          <div>
+            <span className={styles.sectionEyebrow}>What you missed</span>
+            <h2 className={styles.sectionTitle}>Recent results</h2>
+          </div>
           <Link href="/archive" className={styles.sectionLink}>
             Browse archive →
           </Link>
         </div>
         {completed.length === 0 ? (
-          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
-            No completed sessions yet.
-          </p>
+          <p className={styles.emptyCopy}>No completed sessions yet.</p>
         ) : (
           <FixtureList fixtures={completed.slice(0, 5)} />
         )}
@@ -206,10 +262,13 @@ export default async function F1LandingPage() {
 
       <section className={styles.section} aria-label="Upcoming calendar">
         <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Upcoming calendar</h2>
+          <div>
+            <span className={styles.sectionEyebrow}>Plan the next race</span>
+            <h2 className={styles.sectionTitle}>Upcoming calendar</h2>
+          </div>
         </div>
         {upcoming.length === 0 ? (
-          <p style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>No upcoming races loaded.</p>
+          <p className={styles.emptyCopy}>No upcoming races loaded.</p>
         ) : (
           <FixtureList fixtures={upcoming.slice(0, 8)} />
         )}
@@ -231,20 +290,39 @@ export default async function F1LandingPage() {
   );
 }
 
+function fixtureStatusLabel(status: string) {
+  if (status === "live") return "Live weekend";
+  if (status === "scheduled") return "Up next";
+  return "Latest result";
+}
+
+function heroSummary(status: string, session: F1Session | undefined) {
+  if (session?.lifecycle === "live") {
+    return `${SESSION_LABEL[session.type] ?? session.type} is live now. Follow timing and race control as it happens.`;
+  }
+  if (status === "scheduled" && session) {
+    return `${SESSION_LABEL[session.type] ?? session.type} is the next session. Open the weekend hub for the complete schedule.`;
+  }
+  return "Catch up with session results, lap pace, tyre strategy, and race-control context from the latest weekend.";
+}
+
+function sessionStateLabel(session: F1Session) {
+  if (session.lifecycle === "live") return "Live now";
+  if (session.lifecycle === "upcoming") return "Scheduled";
+  if (session.detailStatus === "available") return "Results ready";
+  if (session.detailStatus === "importing") return "Importing data";
+  if (session.detailStatus === "upstream-unavailable") return "Summary only";
+  return "Completed";
+}
+
 function FixtureList({ fixtures }: { fixtures: F1Fixture[] }) {
   return (
     <ul className={styles.fixtureList}>
       {fixtures.map((fixture) => (
         <li key={fixture.id}>
-          {fixture.detailAvailable ? (
-            <Link href={`/events/${fixture.id}`} className={styles.fixtureRow}>
-              <FixtureRowContent fixture={fixture} />
-            </Link>
-          ) : (
-            <span className={styles.fixtureRow} aria-disabled="true">
-              <FixtureRowContent fixture={fixture} />
-            </span>
-          )}
+          <Link href={`/events/${fixture.id}`} className={styles.fixtureRow}>
+            <FixtureRowContent fixture={fixture} />
+          </Link>
         </li>
       ))}
     </ul>

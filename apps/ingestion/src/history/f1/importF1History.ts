@@ -106,10 +106,8 @@ export async function importF1Season(provider: SportsProvider, options: F1Histor
       const existing = await prisma.fixtureDataProfile.findUnique({
         where: { source_externalId: { source: provider.id, externalId: fixture.id } },
       });
-      if (existing?.fixtureId === fixture.id) {
-        skipped += 1;
-        continue;
-      }
+      if (existing && existing.fixtureId !== fixture.id)
+        throw new Error(`${provider.id} fixture identity ${fixture.id} is already assigned to ${existing.fixtureId}`);
       await prisma.$transaction(async (tx) => {
         await tx.fixture.upsert({
           where: { id: fixture.id },
@@ -142,7 +140,10 @@ export async function importF1Season(provider: SportsProvider, options: F1Histor
           update: {
             source: provider.id,
             externalId: fixture.id,
-            coverage: "summary",
+            // A summary refresh must never downgrade a fixture whose detailed
+            // session data has already been imported.
+            coverage:
+              existing?.coverage === "event-data" || existing?.coverage === "partial" ? existing.coverage : "summary",
             attribution: attribution(provider.id),
             datePrecision: "instant",
             importedAt: new Date(),
@@ -157,7 +158,8 @@ export async function importF1Season(provider: SportsProvider, options: F1Histor
           },
         });
       });
-      imported += 1;
+      if (existing) skipped += 1;
+      else imported += 1;
     }
     await prisma.historicalImport.update({
       where: { id: run.id },

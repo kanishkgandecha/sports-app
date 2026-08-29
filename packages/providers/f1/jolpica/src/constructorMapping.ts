@@ -37,6 +37,7 @@ export const JOLPICA_CONSTRUCTOR_TO_TEAM_SLUG: Record<string, string> = {
   williams: "williams",
   aston_martin: "aston-martin",
   cadillac: "cadillac",
+  sauber: "kick-sauber",
 };
 
 /**

@@ -11,23 +11,25 @@ export function PitStopList({ stops, loading, error }: { stops: F1PitStop[]; loa
   }
 
   return (
-    <table className={styles.pitTable}>
-      <thead>
-        <tr>
-          <th scope="col">Driver</th>
-          <th scope="col">Lap</th>
-          <th scope="col">Duration</th>
-        </tr>
-      </thead>
-      <tbody>
-        {stops.map((stop) => (
-          <tr key={stop.id}>
-            <td>{stop.driver.shortName ?? stop.driver.name}</td>
-            <td>{stop.lap}</td>
-            <td>{(stop.durationMs / 1000).toFixed(1)}s</td>
+    <div className={styles.pitScroll}>
+      <table className={styles.pitTable}>
+        <thead>
+          <tr>
+            <th scope="col">Driver</th>
+            <th scope="col">Lap</th>
+            <th scope="col">Duration</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {stops.map((stop) => (
+            <tr key={stop.id}>
+              <td>{stop.driver.shortName ?? stop.driver.name}</td>
+              <td>{stop.lap}</td>
+              <td>{(stop.durationMs / 1000).toFixed(1)}s</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -121,10 +121,11 @@ export interface OpenF1Stint {
   meeting_key: number;
   driver_number: number;
   stint_number: number;
-  lap_start: number;
+  /** Missing on some real practice-session rows; those rows cannot form a normalized stint. */
+  lap_start: number | null;
   lap_end: number | null;
-  compound: string;
-  tyre_age_at_start: number;
+  compound: string | null;
+  tyre_age_at_start: number | null;
 }
 
 /**
@@ -163,7 +164,8 @@ export interface OpenF1SessionResult {
   meeting_key: number;
   driver_number: number;
   position: number | null;
-  number_of_laps: number;
+  /** Null on at least one real disqualified-driver result. */
+  number_of_laps: number | null;
   /** Present on Race sessions — points earned in this specific session, not season total. */
   points?: number | null;
   dnf: boolean;

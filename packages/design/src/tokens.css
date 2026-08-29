@@ -12,28 +12,56 @@
  */
 
 :root {
+  /* ---- primitives ------------------------------------------------------ */
+  --color-f1-red-600: #e10600;
+  --color-f1-red-700: #b80500;
+  --color-yellow-500: #ffb800;
+  --color-green-600: #2f9e44;
+  --color-blue-600: #1c7ed6;
+  --color-white: #ffffff;
+
   /* ---- color: light (default) ---------------------------------------- */
   --color-bg: #f3f4f6;
   --color-surface: #ffffff;
   --color-surface-2: #eceef1;
   --color-text: #12151a;
   --color-text-muted: #5a6472;
-  --color-text-faint: #8991a0;
+  --color-text-faint: #667080;
   --color-border: #e0e3e8;
 
-  /* Brand accent — used for navigation, links, focus states, across every
-     sport. Deliberately not the same hue as any single-sport skin. */
-  --color-accent: #0f7a72;
-  --color-accent-strong: #095c56;
-  --color-accent-soft: #e2f1ee;
+  /* Product semantic — this is now an F1-only experience, so the shared
+     brand accent can intentionally carry the sport's visual identity.
+     --color-accent is deliberately its own literal value here, not
+     `var(--color-f1-red-600)` — Phase 6's automated contrast check
+     (apps/web/lib/designTokenContrast.test.ts) found the primitive
+     (#e10600) only reaches 4.20:1 against --color-accent-soft below (the
+     FreshnessIndicator "updated" pill's background), short of WCAG AA's
+     4.5:1 for that pill's small text. This one shade darker clears it
+     (4.61:1) without touching --color-f1-red-600 itself, which still
+     backs the primary button (white-on-red already passes at 4.97:1) and
+     the tyre-compound dot below. */
+  --color-accent: #d50600;
+  --color-accent-strong: var(--color-f1-red-700);
+  --color-accent-soft: #fae8e7;
+
+  /* Compatibility aliases for surfaces used by route-level UI. Keeping
+     these semantic prevents individual pages from inventing raw colors. */
+  --color-background: var(--color-bg);
+  --color-surface-raised: var(--color-surface-2);
 
   /* Semantic — data freshness (master brief §21). Never reuse --color-accent
-     for these; freshness must stay legible independent of brand styling. */
-  --color-live: #d1401f;
+     for these; freshness must stay legible independent of brand styling.
+     Phase 6's contrast check found the original live/delayed/offline
+     values reached only 3.94/3.75/3.34:1 against their own "-soft" pill
+     background (FreshnessIndicator's text is 12px, so WCAG AA requires
+     4.5:1, not the 3:1 large-text/UI-component threshold) — each darkened
+     one shade to clear it (4.5–4.6:1) without changing the "-soft"
+     backgrounds themselves or any other token. */
+  --color-live: #be3a1c;
   --color-live-soft: #fbe7e0;
-  --color-delayed: #a86b00;
+  --color-delayed: #945e00;
   --color-delayed-soft: #f6ecd3;
-  --color-offline: #7a828f;
+  --color-offline: #656b76;
   --color-offline-soft: #eceef1;
 
   /* Semantic — directional (standings movement, timing deltas). */
@@ -64,6 +92,11 @@
   --line-height-tight: 1.15;
   --line-height-base: 1.5;
 
+  /* ---- layout ---------------------------------------------------------- */
+  --content-max-width: 60rem;
+  --content-wide-max-width: 70rem;
+  --content-measure-wide: 42rem;
+
   /* ---- spacing (4px base) ---------------------------------------------- */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -89,6 +122,27 @@
   --duration-base: 200ms;
   --duration-slow: 400ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ---- component ------------------------------------------------------- */
+  --control-min-height: 2.75rem;
+  --control-compact-min-height: 2.375rem;
+  --control-radius: var(--radius-md);
+  --nav-height: 4rem;
+  --nav-height-mobile: 3.75rem;
+  --icon-size-sm: 1.25rem;
+  --list-row-min-height: 3.625rem;
+  --list-row-min-height-mobile: 4rem;
+  --card-border: var(--color-border);
+  --card-bg: var(--color-surface);
+  --card-bg-hover: var(--color-surface-2);
+  --button-primary-bg: var(--color-f1-red-600);
+  --button-primary-bg-hover: var(--color-f1-red-700);
+  --button-primary-fg: var(--color-white);
+  --tyre-soft: var(--color-f1-red-600);
+  --tyre-medium: var(--color-yellow-500);
+  --tyre-hard: var(--color-text);
+  --tyre-intermediate: var(--color-green-600);
+  --tyre-wet: var(--color-blue-600);
 }
 
 /* ---- color: dark, via OS preference (no explicit theme chosen) --------- */
@@ -99,18 +153,21 @@
     --color-surface-2: #1a1e24;
     --color-text: #e7e9ec;
     --color-text-muted: #9aa2ad;
-    --color-text-faint: #667080;
+    --color-text-faint: #8b95a3;
     --color-border: #262b33;
 
-    --color-accent: #2fb7ac;
-    --color-accent-strong: #58d0c5;
-    --color-accent-soft: #10302c;
+    --color-accent: #ff5a54;
+    --color-accent-strong: #ff817d;
+    --color-accent-soft: #3a1716;
 
     --color-live: #ef7350;
     --color-live-soft: #301c14;
     --color-delayed: #d9a53d;
     --color-delayed-soft: #2a2311;
-    --color-offline: #6b7280;
+    /* Phase 6 — lightened one shade from #6b7280: the original reached
+       3.46:1 against --color-offline-soft, short of WCAG AA's 4.5:1 for
+       the FreshnessIndicator pill's 12px text; 4.64:1 now. */
+    --color-offline: #818793;
     --color-offline-soft: #1a1e24;
 
     --color-positive: #3ecb7d;
@@ -128,18 +185,21 @@
   --color-surface-2: #1a1e24;
   --color-text: #e7e9ec;
   --color-text-muted: #9aa2ad;
-  --color-text-faint: #667080;
+  --color-text-faint: #8b95a3;
   --color-border: #262b33;
 
-  --color-accent: #2fb7ac;
-  --color-accent-strong: #58d0c5;
-  --color-accent-soft: #10302c;
+  --color-accent: #ff5a54;
+  --color-accent-strong: #ff817d;
+  --color-accent-soft: #3a1716;
 
   --color-live: #ef7350;
   --color-live-soft: #301c14;
   --color-delayed: #d9a53d;
   --color-delayed-soft: #2a2311;
-  --color-offline: #6b7280;
+  /* Phase 6 — see the matching comment in the `@media (prefers-color-scheme:
+     dark)` block above; this block (an explicit dark-theme choice) must
+     carry the same fix independently since it doesn't inherit from it. */
+  --color-offline: #818793;
   --color-offline-soft: #1a1e24;
 
   --color-positive: #3ecb7d;

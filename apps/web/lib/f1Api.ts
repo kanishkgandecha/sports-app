@@ -31,6 +31,7 @@ export interface F1Fixture {
 }
 
 export type F1SessionLifecycle = "upcoming" | "live" | "completed";
+export type F1SessionDetailStatus = "summary" | "importing" | "available" | "upstream-unavailable" | "failed";
 
 export interface F1Session {
   id: string;
@@ -40,6 +41,9 @@ export interface F1Session {
   startTime: string;
   endTime: string | null;
   detailAvailable: boolean;
+  detailStatus: F1SessionDetailStatus;
+  detailReason: string | null;
+  nextRetryAt: string | null;
 }
 
 export interface F1DriverRef {
@@ -77,6 +81,42 @@ export interface F1PitStop {
   lap: number;
   durationMs: number;
   timestamp: string;
+}
+
+export interface F1SessionResult {
+  position: number | null;
+  driver: F1DriverRef;
+  status: "classified" | "dnf" | "dns" | "dsq";
+  lapsCompleted: number | null;
+  points: number | null;
+  durationSeconds: number | null;
+  gapToLeader: string | null;
+  phases: Array<{ duration: number | null; gap: string | null }>;
+}
+
+export interface F1Lap {
+  id: string;
+  driver: F1DriverRef;
+  lapNumber: number;
+  startedAt: string | null;
+  duration: number | null;
+  sector1: number | null;
+  sector2: number | null;
+  sector3: number | null;
+  speedI1: number | null;
+  speedI2: number | null;
+  speedTrap: number | null;
+  isPitOutLap: boolean;
+}
+
+export interface F1TyreStint {
+  id: string;
+  driver: F1DriverRef;
+  stintNumber: number;
+  lapStart: number;
+  lapEnd: number | null;
+  compound: string | null;
+  tyreAgeAtStart: number | null;
 }
 
 /**
@@ -118,6 +158,21 @@ export function getF1Fixture(fixtureId: string) {
   return apiGet<{ fixture: F1Fixture; sessions: F1Session[] }>(`/api/f1/fixtures/${fixtureId}`);
 }
 
+/**
+ * Phase 4 (sitemap) — the plain fixtures list (`GET /api/f1/fixtures`,
+ * apps/api/src/routes/f1.ts), distinct from `getArchiveFixtures`
+ * (archiveApi.ts), which wraps the cursor-paginated, filterable archive
+ * route built for the search UI. `limit` maxes out at 100 server-side; the
+ * rolling 2024-2026 window (78 fixtures at last count — see
+ * docs/CONTEXT.md) fits in a single call.
+ */
+export function getF1Fixtures(options: { limit?: number } = {}) {
+  const params = new URLSearchParams();
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  const query = params.toString();
+  return apiGet<{ fixtures: F1Fixture[] }>(`/api/f1/fixtures${query ? `?${query}` : ""}`);
+}
+
 export function getF1Session(sessionId: string) {
   return apiGet<{ session: F1Session; fixture: F1Fixture; freshness: F1Freshness }>(`/api/f1/sessions/${sessionId}`);
 }
@@ -134,6 +189,21 @@ export function getF1RaceControl(sessionId: string) {
 
 export function getF1PitStops(sessionId: string) {
   return apiGet<{ pitStops: F1PitStop[]; freshness: F1Freshness }>(`/api/f1/sessions/${sessionId}/pit-stops`);
+}
+
+export function getF1Results(sessionId: string) {
+  return apiGet<{ results: F1SessionResult[] }>(`/api/f1/sessions/${sessionId}/results`);
+}
+
+export function getF1Laps(sessionId: string, driverId?: string) {
+  const query = new URLSearchParams();
+  if (driverId) query.set("driverId", driverId);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return apiGet<{ laps: F1Lap[]; truncated: boolean }>(`/api/f1/sessions/${sessionId}/laps${suffix}`);
+}
+
+export function getF1Stints(sessionId: string) {
+  return apiGet<{ stints: F1TyreStint[] }>(`/api/f1/sessions/${sessionId}/stints`);
 }
 
 export function getF1DriverStandings(year: number) {

@@ -1,0 +1,56 @@
+/* Phase 5 — was built from inline `style` props keyed by freshness state;
+   the strict CSP style-src (no unsafe-inline) blocks inline style
+   attributes entirely. `DataFreshnessState` is a small, build-time-known
+   enum (packages/design/src/tokens.ts), so a data-attribute-keyed class per
+   state is the correct fix here — no nonce needed (contrast
+   TeamColorDot.tsx, which handles the genuinely provider-dynamic case). */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-data);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.pill[data-state="live"] {
+  color: var(--color-live);
+  background: var(--color-live-soft);
+}
+.pill[data-state="live"] .dot {
+  background: var(--color-live);
+}
+
+.pill[data-state="updated"] {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.pill[data-state="updated"] .dot {
+  background: var(--color-accent);
+}
+
+.pill[data-state="delayed"] {
+  color: var(--color-delayed);
+  background: var(--color-delayed-soft);
+}
+.pill[data-state="delayed"] .dot {
+  background: var(--color-delayed);
+}
+
+.pill[data-state="offline"] {
+  color: var(--color-offline);
+  background: var(--color-offline-soft);
+}
+.pill[data-state="offline"] .dot {
+  background: var(--color-offline);
+}

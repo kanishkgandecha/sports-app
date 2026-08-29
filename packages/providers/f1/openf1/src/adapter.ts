@@ -9,6 +9,7 @@ import type {
   Standing,
   Team,
   Venue,
+  f1,
 } from "@sports/domain";
 import { BaseProviderAdapter, type RequestLogger, type SportsProvider } from "@sports/providers-core";
 import { OpenF1FetchClient, type OpenF1HttpClient } from "./client";
@@ -30,8 +31,11 @@ import {
   intervalTimingPatch,
   lapTimingPatch,
   normalizeLap,
+  normalizeLapRecord,
   normalizePitStop,
+  normalizeSessionClassification,
   normalizeStint,
+  normalizeTyreStint,
   positionTimingPatch,
   sessionResultTimingPatch,
 } from "./normalize/timing";
@@ -55,6 +59,15 @@ export interface OpenF1HistoricalSessionDetail {
   players: Player[];
   events: LiveEvent[];
   timingPatches: DriverTimingPatch[];
+  classifications: f1.SessionClassification[];
+  laps: f1.Lap[];
+  stints: f1.TyreStint[];
+}
+
+export interface OpenF1HistoricalSessionAnalysis {
+  classifications: f1.SessionClassification[];
+  laps: f1.Lap[];
+  stints: f1.TyreStint[];
 }
 
 /**
@@ -189,7 +202,42 @@ export class OpenF1Adapter extends BaseProviderAdapter implements SportsProvider
     }
     finalStints.forEach((stint) => merge(normalizeStint(stint, sessionId)));
 
-    return { teams, players, events, timingPatches: [...patches.values()] };
+    return {
+      teams,
+      players,
+      events,
+      timingPatches: [...patches.values()],
+      classifications: results.map((result) => normalizeSessionClassification(result, sessionId)),
+      laps: laps.map((lap) => normalizeLapRecord(lap, sessionId)),
+      stints: stints
+        .map((stint) => normalizeTyreStint(stint, sessionId))
+        .filter((stint): stint is f1.TyreStint => stint !== null),
+    };
+  }
+
+  /**
+   * Focused historical-analysis snapshot. The rolling Phase 2 backfill does
+   * not need to re-download drivers, race control, or pit events already
+   * persisted by the detail importer, so this deliberately reads only the
+   * three normalized analysis sources.
+   */
+  async getHistoricalSessionAnalysis(sessionId: string): Promise<OpenF1HistoricalSessionAnalysis> {
+    const sessionKey = sessionKeyFromSessionId(sessionId);
+    const [results, laps, stints] = await this.timed("getHistoricalSessionAnalysis", () =>
+      Promise.all([
+        this.client.get<OpenF1SessionResult>("/session_result", { session_key: sessionKey }),
+        this.client.get<OpenF1Lap>("/laps", { session_key: sessionKey }),
+        this.client.get<OpenF1Stint>("/stints", { session_key: sessionKey }),
+      ]),
+    );
+
+    return {
+      classifications: results.map((result) => normalizeSessionClassification(result, sessionId)),
+      laps: laps.map((lap) => normalizeLapRecord(lap, sessionId)),
+      stints: stints
+        .map((stint) => normalizeTyreStint(stint, sessionId))
+        .filter((stint): stint is f1.TyreStint => stint !== null),
+    };
   }
 
   /**

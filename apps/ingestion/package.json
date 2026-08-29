@@ -8,11 +8,15 @@
     "build": "tsup src/index.ts --format cjs --clean",
     "start": "node --env-file=../../.env dist/index.cjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --exclude '**/*.integration.test.ts'",
+    "test:integration": "vitest run .integration.test.ts --no-file-parallelism",
     "history:f1": "tsx --env-file=../../.env src/history/f1/cli.ts",
     "history:f1:rolling": "tsx --env-file=../../.env src/history/f1/cli.ts --years=3 --limit=30",
     "history:f1:details": "tsx --env-file=../../.env src/history/f1/detailCli.ts",
-    "history:f1:details:rolling": "tsx --env-file=../../.env src/history/f1/detailCli.ts --years=3 --limit=30"
+    "history:f1:details:rolling": "tsx --env-file=../../.env src/history/f1/detailCli.ts --years=3 --limit=30 --session-types=ALL",
+    "history:f1:analysis": "tsx --env-file=../../.env src/history/f1/analysisCli.ts",
+    "history:f1:analysis:rolling": "tsx --env-file=../../.env src/history/f1/analysisCli.ts --years=3 --limit=30 --session-types=ALL",
+    "history:f1:standings:rolling": "tsx --env-file=../../.env src/history/f1/standingsCli.ts --years=3"
   },
   "dependencies": {
     "@sports/db": "workspace:*",

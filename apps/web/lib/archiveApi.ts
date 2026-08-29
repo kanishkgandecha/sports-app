@@ -4,13 +4,15 @@ export interface ArchiveFixture {
   id: string;
   name: string;
   status: string;
+  kind: "race-weekend" | "testing" | "other";
   startTime: string;
   season: { id: string; label: string };
   competition: { id: string; slug: string; name: string; type: string };
   venue: { id: string; name: string; country: string; timezone: string } | null;
-  coverage: "summary" | "event-data";
+  coverage: "summary" | "partial" | "event-data";
   source: { provider: string; attribution: string | null } | null;
   detailAvailable: boolean;
+  sessionCoverage: { total: number; available: number; unavailable: number; failed: number; importing: number };
 }
 
 export interface ArchiveOptions {

@@ -11,6 +11,32 @@ interface ConceptDetail {
   followedBy: { slug: string; title: string }[];
 }
 
+const INTERNAL_CONCEPT_LINK = /\[([^\]]+)\]\(#([a-z0-9-]+)\)/g;
+
+function renderExplanation(text: string, onNavigate: (slug: string) => void) {
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+
+  for (const match of text.matchAll(INTERNAL_CONCEPT_LINK)) {
+    const index = match.index ?? 0;
+    if (index > cursor) parts.push(text.slice(cursor, index));
+    parts.push(
+      <button
+        key={`${match[2]}-${index}`}
+        type="button"
+        className={styles.drawerInlineLink}
+        onClick={() => onNavigate(match[2])}
+      >
+        {match[1]}
+      </button>,
+    );
+    cursor = index + match[0].length;
+  }
+
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts.length > 0 ? parts : text;
+}
+
 /**
  * The one drawer instance any Event Center shares — opened with a concept
  * slug from anywhere (an "Explain this" entry point, a live-feed message's
@@ -31,6 +57,7 @@ export function GlossaryDrawer({
   const [data, setData] = useState<ConceptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const drawerRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -93,7 +120,7 @@ export function GlossaryDrawer({
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, retryKey]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -107,8 +134,13 @@ export function GlossaryDrawer({
   // prix" following "what-is-f1" while also being generically related) —
   // deduped by slug, found via a real-browser check flagging a duplicate
   // React key (Checkpoint 5, docs/CONTEXT.md §10).
+  const inlineConceptSlugs = new Set(
+    data ? [...data.concept.detailExplanation.matchAll(INTERNAL_CONCEPT_LINK)].map((match) => match[2]) : [],
+  );
   const related = data
-    ? [...new Map([...data.followedBy, ...data.related].map((c) => [c.slug, c])).values()].slice(0, 4)
+    ? [...new Map([...data.followedBy, ...data.related].map((c) => [c.slug, c])).values()]
+        .filter((concept) => !inlineConceptSlugs.has(concept.slug))
+        .slice(0, 4)
     : [];
 
   return (
@@ -128,11 +160,18 @@ export function GlossaryDrawer({
           Close
         </button>
         {loading && <p className={styles.drawerBody}>Loading…</p>}
-        {error && <p className={styles.drawerBody}>Couldn&apos;t load this explanation right now.</p>}
+        {error && (
+          <div className={styles.drawerError} role="alert">
+            <p className={styles.drawerBody}>Couldn&apos;t load this explanation right now.</p>
+            <button type="button" className={styles.drawerRetry} onClick={() => setRetryKey((value) => value + 1)}>
+              Try again
+            </button>
+          </div>
+        )}
         {data && (
           <>
             <h2 className={styles.drawerTitle}>{data.concept.title}</h2>
-            <p className={styles.drawerBody}>{data.concept.detailExplanation}</p>
+            <p className={styles.drawerBody}>{renderExplanation(data.concept.detailExplanation, onNavigate)}</p>
             {related.length > 0 && (
               <div className={styles.drawerRelated}>
                 <span className={styles.drawerRelatedLabel}>Related</span>
