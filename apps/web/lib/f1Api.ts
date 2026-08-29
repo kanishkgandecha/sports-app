@@ -158,6 +158,21 @@ export function getF1Fixture(fixtureId: string) {
   return apiGet<{ fixture: F1Fixture; sessions: F1Session[] }>(`/api/f1/fixtures/${fixtureId}`);
 }
 
+/**
+ * Phase 4 (sitemap) — the plain fixtures list (`GET /api/f1/fixtures`,
+ * apps/api/src/routes/f1.ts), distinct from `getArchiveFixtures`
+ * (archiveApi.ts), which wraps the cursor-paginated, filterable archive
+ * route built for the search UI. `limit` maxes out at 100 server-side; the
+ * rolling 2024-2026 window (78 fixtures at last count — see
+ * docs/CONTEXT.md) fits in a single call.
+ */
+export function getF1Fixtures(options: { limit?: number } = {}) {
+  const params = new URLSearchParams();
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  const query = params.toString();
+  return apiGet<{ fixtures: F1Fixture[] }>(`/api/f1/fixtures${query ? `?${query}` : ""}`);
+}
+
 export function getF1Session(sessionId: string) {
   return apiGet<{ session: F1Session; fixture: F1Fixture; freshness: F1Freshness }>(`/api/f1/sessions/${sessionId}`);
 }

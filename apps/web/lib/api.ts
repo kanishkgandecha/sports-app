@@ -27,6 +27,18 @@ export const API_BASE_URL = isServer
   ? (process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000")
   : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000");
 
+/**
+ * Phase 4 (launch-readiness) — the *browser*-reachable API origin, always
+ * `NEXT_PUBLIC_API_URL` regardless of where this constant is read from.
+ *
+ * Used only by proxy.ts to build the CSP `connect-src` list, which governs
+ * what the browser is permitted to fetch — never `API_BASE_URL`'s
+ * server-side branch, which can resolve to the Docker-internal
+ * `API_INTERNAL_URL` (e.g. `http://api:4000`), an origin the browser can
+ * neither reach nor should be told to trust.
+ */
+export const PUBLIC_API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
 export class ApiError extends Error {
   constructor(
     message: string,
