@@ -4,6 +4,7 @@ import type { SequencedLiveEvent } from "@sports/domain";
 import type { LiveEventBus } from "../liveEventBus.js";
 
 const REPLAY_BATCH_SIZE = 500;
+const HEARTBEAT_INTERVAL_MS = 5_000;
 
 export function parseCursor(value: string | string[] | undefined): bigint | null | "invalid" {
   if (Array.isArray(value)) return "invalid";
@@ -91,10 +92,10 @@ export async function liveRoutes(app: FastifyInstance, bus: LiveEventBus, corsOr
       // `connectionTimeout: 10_000` (Node's per-socket idle timeout,
       // meant to drop slow/abandoned *connecting* clients on ordinary
       // request/response routes). It applies to every socket by default,
-      // including this one — and it's *shorter* than the 15-second
-      // heartbeat below, so the socket was being killed by Node itself
-      // roughly every 10 seconds, well before a heartbeat could ever keep
-      // it alive, which the browser reported as
+      // including this one. The original 15-second heartbeat was longer
+      // than that timeout, so the socket was being killed by Node itself
+      // roughly every 10 seconds before a heartbeat could keep it alive,
+      // which the browser reported as
       // `net::ERR_INCOMPLETE_CHUNKED_ENCODING` and `useLiveSession`
       // dutifully reconnected from (a ~13s cycle: 10s idle timeout + the
       // hook's 3s reconnect delay — confirmed against the container's
@@ -142,10 +143,13 @@ export async function liveRoutes(app: FastifyInstance, bus: LiveEventBus, corsOr
         replaying = false;
       }
 
-      // Keep the connection alive through proxies that time out idle streams.
+      // Keep the connection alive through Node/proxies that time out idle
+      // streams. This must stay below buildApp's 10-second connectionTimeout;
+      // the per-socket override above is defense in depth because Node/Fastify
+      // can reapply the server timeout during raw-response setup on Linux.
       const heartbeat = setInterval(() => {
         reply.raw.write(`: heartbeat ${new Date().toISOString()}\n\n`);
-      }, 15000);
+      }, HEARTBEAT_INTERVAL_MS);
 
       req.raw.on("close", () => {
         clearInterval(heartbeat);
