@@ -188,7 +188,9 @@ describe("GET /api/sessions/:sessionId/stream (integration, real Postgres + LIST
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) await app.close();
+    if (!sportId) return;
+
     await prisma.liveEvent.deleteMany({ where: { sportId } });
     await prisma.session.deleteMany({ where: { id: SESSION_ID } });
     await prisma.fixture.deleteMany({ where: { id: "sse-test-fixture" } });
