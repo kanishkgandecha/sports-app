@@ -9,6 +9,7 @@ import {
 } from "../../../lib/f1Api";
 import { StateView } from "../StateView";
 import { EducationTrigger } from "../../GlossaryDrawer";
+import { TeamColorDot } from "../../TeamColorDot";
 import styles from "./f1EventCenter.module.css";
 
 interface ListState<T> {
@@ -186,10 +187,10 @@ function DriverStandingsTable({
               <td className={styles.position}>{row.position}</td>
               <td>
                 <div className={styles.driverCell}>
-                  <span
+                  <TeamColorDot
+                    id={row.driver.id}
+                    colorHex={row.team?.colorHex ?? null}
                     className={styles.teamSwatch}
-                    style={{ background: row.team?.colorHex ?? "var(--color-border)" }}
-                    aria-hidden="true"
                   />
                   <span className={styles.driverCode}>
                     {row.driver.shortName ?? row.driver.name.slice(0, 3).toUpperCase()}
@@ -243,11 +244,7 @@ function ConstructorStandingsTable({
               <td className={styles.position}>{row.position}</td>
               <td>
                 <div className={styles.driverCell}>
-                  <span
-                    className={styles.teamSwatch}
-                    style={{ background: row.team.colorHex ?? "var(--color-border)" }}
-                    aria-hidden="true"
-                  />
+                  <TeamColorDot id={row.team.id} colorHex={row.team.colorHex} className={styles.teamSwatch} />
                   <span className={styles.driverFullName}>{row.team.name}</span>
                 </div>
               </td>

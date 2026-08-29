@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { freshnessTokens, type DataFreshnessState } from "@sports/design";
+import styles from "./FreshnessIndicator.module.css";
 
 /**
  * The component every live surface must use instead of a bare "LIVE" label —
@@ -22,30 +23,8 @@ export function FreshnessIndicator({ state, updatedAt }: { state: DataFreshnessS
   const label = state === "live" && secondsAgo > 0 ? `LIVE · ${secondsAgo}s AGO` : tokens.label;
 
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "var(--space-2)",
-        fontFamily: "var(--font-data)",
-        fontSize: "var(--font-size-xs)",
-        fontWeight: 700,
-        letterSpacing: "0.04em",
-        padding: "3px var(--space-2)",
-        borderRadius: "var(--radius-full)",
-        color: tokens.fg,
-        background: tokens.bg,
-      }}
-    >
-      <span
-        aria-hidden
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: "50%",
-          background: tokens.fg,
-        }}
-      />
+    <span className={styles.pill} data-state={state}>
+      <span aria-hidden className={styles.dot} />
       {label}
     </span>
   );

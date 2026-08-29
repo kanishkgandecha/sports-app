@@ -146,7 +146,7 @@ export function F1EventCenter({
   });
 
   if (!activeSession) {
-    return <p style={{ color: "var(--color-text-faint)" }}>This fixture has no sessions yet.</p>;
+    return <p className={styles.noSessions}>This fixture has no sessions yet.</p>;
   }
 
   function selectSession(sessionId: string) {

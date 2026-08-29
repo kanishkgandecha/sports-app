@@ -1,7 +1,18 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StandingsPanel } from "./StandingsPanel";
+
+// TeamColorDot (see its doc comment) appends into this shared,
+// already-approved stylesheet rather than an inline style attribute; tests
+// provide it the way the real root layout does.
+let sheetEl: HTMLStyleElement;
+beforeEach(() => {
+  sheetEl = document.createElement("style");
+  sheetEl.id = "dynamic-team-colors";
+  document.head.appendChild(sheetEl);
+});
+afterEach(() => sheetEl.remove());
 
 const driverStandingsBody = {
   season: { year: "2026", id: "f1-season-2026" },
@@ -125,6 +136,18 @@ describe("StandingsPanel", () => {
 
     await userEvent.click(screen.getByText(/how are these determined/i));
     expect(onExplain).toHaveBeenCalledWith("championship-points");
+  });
+
+  it("Phase 5 regression: never renders an inline style for the team-color swatch, in either tab, using the shared stylesheet instead", async () => {
+    vi.stubGlobal("fetch", mockFetchOk());
+    const { container } = render(<StandingsPanel year={2026} onExplain={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText("219")).toBeInTheDocument());
+    expect(container.querySelector("[style]")).toBeNull();
+    const rules = Array.from(sheetEl.sheet!.cssRules as unknown as CSSStyleRule[]);
+    expect(rules.some((rule) => rule.style.background === "rgb(39, 244, 210)")).toBe(true);
+
+    await userEvent.click(screen.getByRole("tab", { name: "Constructors" }));
+    expect(container.querySelector("[style]")).toBeNull();
   });
 
   it("re-fetches when the year prop changes", async () => {

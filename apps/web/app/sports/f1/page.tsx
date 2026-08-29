@@ -13,6 +13,7 @@ import { apiGet } from "../../../lib/api";
 import { formatDate, formatDateTime } from "../../../lib/format";
 import styles from "./f1Landing.module.css";
 import { Countdown } from "../../../components/Countdown";
+import { TeamColorDot } from "../../../components/TeamColorDot";
 
 export const metadata: Metadata = { title: "F1 Race Center" };
 
@@ -183,10 +184,10 @@ export default async function F1LandingPage() {
               {driverStandings.map((s) => (
                 <div className={styles.standingsRow} key={s.driver.id}>
                   <span className={styles.standingsPos}>{s.position}</span>
-                  <span
+                  <TeamColorDot
+                    id={s.driver.id}
+                    colorHex={s.team?.colorHex ?? null}
                     className={styles.standingsSwatch}
-                    style={{ background: s.team?.colorHex ?? "var(--color-border)" }}
-                    aria-hidden="true"
                   />
                   <span className={styles.standingsName}>{s.driver.shortName ?? s.driver.name}</span>
                   <span className={styles.standingsPoints}>{s.points}</span>
@@ -201,11 +202,7 @@ export default async function F1LandingPage() {
               {constructorStandings.map((s) => (
                 <div className={styles.standingsRow} key={s.team.id}>
                   <span className={styles.standingsPos}>{s.position}</span>
-                  <span
-                    className={styles.standingsSwatch}
-                    style={{ background: s.team.colorHex ?? "var(--color-border)" }}
-                    aria-hidden="true"
-                  />
+                  <TeamColorDot id={s.team.id} colorHex={s.team.colorHex} className={styles.standingsSwatch} />
                   <span className={styles.standingsName}>{s.team.name}</span>
                   <span className={styles.standingsPoints}>{s.points}</span>
                 </div>

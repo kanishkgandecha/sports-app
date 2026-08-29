@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { buildArchiveQuery, getArchiveFixtures, getArchiveOptions, type ArchiveFilters } from "../../lib/archiveApi";
 import { formatDate, venueLine } from "../../lib/format";
+import { growClass } from "./growClass";
 import styles from "./archive.module.css";
 
 export const metadata: Metadata = { title: "F1 archive" };
@@ -209,28 +210,21 @@ async function ArchiveContent({ searchParams }: { searchParams: RawSearchParams 
                 <div className={styles.sessionCoverage}>
                   <div className={styles.coverageTrack} aria-hidden="true">
                     {fixture.sessionCoverage.available > 0 && (
-                      <span
-                        className={styles.coverageAvailable}
-                        style={{ flexGrow: fixture.sessionCoverage.available }}
-                      />
+                      <span className={`${styles.coverageAvailable} ${growClass(fixture.sessionCoverage.available)}`} />
                     )}
                     {fixture.sessionCoverage.unavailable > 0 && (
                       <span
-                        className={styles.coverageUnavailable}
-                        style={{ flexGrow: fixture.sessionCoverage.unavailable }}
+                        className={`${styles.coverageUnavailable} ${growClass(fixture.sessionCoverage.unavailable)}`}
                       />
                     )}
                     {fixture.sessionCoverage.failed > 0 && (
-                      <span className={styles.coverageFailed} style={{ flexGrow: fixture.sessionCoverage.failed }} />
+                      <span className={`${styles.coverageFailed} ${growClass(fixture.sessionCoverage.failed)}`} />
                     )}
                     {fixture.sessionCoverage.importing > 0 && (
-                      <span
-                        className={styles.coverageImporting}
-                        style={{ flexGrow: fixture.sessionCoverage.importing }}
-                      />
+                      <span className={`${styles.coverageImporting} ${growClass(fixture.sessionCoverage.importing)}`} />
                     )}
                     {pendingSessionCount(fixture) > 0 && (
-                      <span className={styles.coveragePending} style={{ flexGrow: pendingSessionCount(fixture) }} />
+                      <span className={`${styles.coveragePending} ${growClass(pendingSessionCount(fixture))}`} />
                     )}
                   </div>
                   <span>{sessionCoverageLabel(fixture)}</span>

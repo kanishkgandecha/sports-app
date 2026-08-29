@@ -1,7 +1,18 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SessionAnalysis } from "./SessionAnalysis";
+
+// TeamColorDot (see its doc comment) appends into this shared,
+// already-approved stylesheet rather than an inline style attribute; tests
+// provide it the way the real root layout does.
+let sheetEl: HTMLStyleElement;
+beforeEach(() => {
+  sheetEl = document.createElement("style");
+  sheetEl.id = "dynamic-team-colors";
+  document.head.appendChild(sheetEl);
+});
+afterEach(() => sheetEl.remove());
 
 const driver = {
   id: "f1-driver-1",
@@ -118,6 +129,18 @@ describe("SessionAnalysis", () => {
     expect(pace).toHaveFocus();
     expect(pace).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", pace.id);
+  });
+
+  it("Phase 5 regression: never renders an inline style for a driver's team-color swatch, in classification or tyre strategy, using the shared stylesheet instead", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+    const { container } = render(<SessionAnalysis sessionId="f1-session-1" sessionType="RACE" />);
+    await waitFor(() => expect(screen.getByText("72")).toBeInTheDocument());
+    expect(container.querySelector("[style]")).toBeNull();
+    const rules = Array.from(sheetEl.sheet!.cssRules as unknown as CSSStyleRule[]);
+    expect(rules.some((rule) => rule.style.background === "rgb(54, 113, 198)")).toBe(true);
+
+    await userEvent.click(screen.getByRole("tab", { name: "Tyre strategy" }));
+    expect(container.querySelector("[style]")).toBeNull();
   });
 
   it("shows an honest empty state when historical analysis has not been imported", async () => {

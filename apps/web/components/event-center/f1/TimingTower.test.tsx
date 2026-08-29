@@ -1,8 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { TimingTower } from "./TimingTower";
 import styles from "./f1EventCenter.module.css";
 import type { F1TimingRow } from "../../../lib/f1Api";
+
+// TeamColorDot (see its doc comment) appends into this shared,
+// already-approved stylesheet rather than an inline style attribute; tests
+// provide it the way the real root layout does.
+let sheetEl: HTMLStyleElement;
+beforeEach(() => {
+  sheetEl = document.createElement("style");
+  sheetEl.id = "dynamic-team-colors";
+  document.head.appendChild(sheetEl);
+});
+afterEach(() => sheetEl.remove());
 
 function row(overrides: Partial<F1TimingRow>): F1TimingRow {
   return {
@@ -99,6 +110,29 @@ describe("TimingTower", () => {
     const region = screen.getByRole("region", { name: "Session timing table" });
     expect(region).toHaveAttribute("tabindex", "0");
     expect(screen.getByText(/Driver positions, gaps, lap times/i)).toBeInTheDocument();
+  });
+
+  it("Phase 5 regression: never renders an inline style for the team-color swatch, using the shared stylesheet instead", () => {
+    const { container } = render(
+      <TimingTower
+        rows={[
+          row({
+            driver: {
+              id: "d1",
+              name: "Leader",
+              shortName: "LDR",
+              avatarUrl: null,
+              team: { id: "t1", name: "Team One", colorHex: "#ff0000" },
+            },
+          }),
+        ]}
+        loading={false}
+        error={false}
+      />,
+    );
+    expect(container.querySelector("[style]")).toBeNull();
+    const rules = Array.from(sheetEl.sheet!.cssRules as unknown as CSSStyleRule[]);
+    expect(rules.some((rule) => rule.style.background === "rgb(255, 0, 0)")).toBe(true);
   });
 
   it("flashes a row via the shared LiveValue mechanism (components/LiveValue.tsx) when its position changes", () => {

@@ -11,6 +11,7 @@ import {
   type F1TyreStint,
 } from "../../../lib/f1Api";
 import { StateView } from "../StateView";
+import { TeamColorDot } from "../../TeamColorDot";
 import styles from "./f1EventCenter.module.css";
 
 type AnalysisTab = "classification" | "pace" | "strategy";
@@ -362,11 +363,7 @@ function TyreStrategy({ stints }: { stints: F1TyreStint[] }) {
 function DriverLabel({ driver }: { driver: F1DriverRef }) {
   return (
     <div className={styles.driverCell}>
-      <span
-        className={styles.teamSwatch}
-        style={{ background: driver.team?.colorHex ?? "var(--color-border)" }}
-        aria-hidden="true"
-      />
+      <TeamColorDot id={driver.id} colorHex={driver.team?.colorHex ?? null} className={styles.teamSwatch} />
       <span className={styles.driverCode}>{driver.shortName ?? driver.name.slice(0, 3).toUpperCase()}</span>
       <span className={styles.driverFullName}>{driver.name}</span>
     </div>

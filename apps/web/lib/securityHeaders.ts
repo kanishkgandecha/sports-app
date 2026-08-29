@@ -5,7 +5,7 @@
  * without NextRequest/NextResponse machinery.
  *
  * Inspected before writing this policy: apps/web has zero third-party
- * scripts, zero inline <style>/styled-jsx, no next/image remote patterns, no
+ * scripts, no <style>/styled-jsx blocks, no next/image remote patterns, no
  * external fonts (Big Shoulders is self-hosted via next/font — see
  * app/fonts.ts, no runtime font-CDN request), and no images at all yet (no
  * <img>/<Image>, no public/ dir — F1DriverRef.avatarUrl exists on the API
@@ -15,6 +15,16 @@
  * lib/api.ts), a different origin than this app's own when running in
  * Docker, so connect-src must allow it explicitly or every data fetch and
  * the live SSE stream would be silently blocked.
+ *
+ * Phase 5 correction: this original audit missed inline `style={{...}}`
+ * *props* (as opposed to `<style>`/styled-jsx blocks) — real-browser QA
+ * caught a dozen of them CSP-blocking at runtime across the archive,
+ * `/sports/f1`, and every Event Center panel. Fixed at the call sites, not
+ * by relaxing this policy: static values moved into CSS Modules classes;
+ * genuinely dynamic values (bounded weekend session counts, and per-team
+ * colors from provider data) moved into build-time-enumerated classes or a
+ * scoped nonce'd `<style>` element (see TeamColorDot.tsx) — never
+ * `unsafe-inline`/`unsafe-hashes`. style-src stays nonce-only.
  */
 
 export interface SecurityHeadersOptions {

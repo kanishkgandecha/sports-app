@@ -2,6 +2,7 @@
 
 import type { F1TimingRow } from "../../../lib/f1Api";
 import { useLiveFlash } from "../../LiveValue";
+import { TeamColorDot } from "../../TeamColorDot";
 import { StateView } from "../StateView";
 import styles from "./f1EventCenter.module.css";
 
@@ -87,11 +88,7 @@ function TimingTowerRow({ row, isLeader }: { row: F1TimingRow; isLeader: boolean
       <td className={`${styles.position} ${styles.timingPositionCell}`}>{row.position}</td>
       <td className={styles.timingDriverCell}>
         <div className={styles.driverCell}>
-          <span
-            className={styles.teamSwatch}
-            style={{ background: row.driver.team?.colorHex ?? "var(--color-border)" }}
-            aria-hidden="true"
-          />
+          <TeamColorDot id={row.driver.id} colorHex={row.driver.team?.colorHex ?? null} className={styles.teamSwatch} />
           <span className={styles.driverCode}>{row.driver.shortName ?? row.driver.name.slice(0, 3).toUpperCase()}</span>
           <span className={styles.driverFullName}>{row.driver.team?.name ?? row.driver.name}</span>
         </div>

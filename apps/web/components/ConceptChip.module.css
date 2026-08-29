@@ -2,6 +2,15 @@
    states and a respectful open/close transition (reduced-motion honored
    via the token layer, same as every other motion in this app). */
 
+/* Phase 5 — the outer wrapper span was missed in that pass and still used
+   an inline `style` prop; the strict CSP style-src (no unsafe-inline)
+   blocks it outright. Static values, so a plain class is enough. */
+.wrapper {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 .trigger {
   display: inline-flex;
   align-items: center;

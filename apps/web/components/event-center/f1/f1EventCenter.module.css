@@ -832,3 +832,11 @@
     gap: var(--space-2);
   }
 }
+
+/* Phase 5 — was an inline `style` prop; the strict CSP style-src (no
+   unsafe-inline) blocks inline style attributes, and this value is a
+   static design token, so a plain class is the correct fix (see
+   TeamColorDot.tsx's doc comment for the genuinely-dynamic case). */
+.noSessions {
+  color: var(--color-text-faint);
+}
