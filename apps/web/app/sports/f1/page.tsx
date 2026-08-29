@@ -14,8 +14,39 @@ import { formatDate, formatDateTime } from "../../../lib/format";
 import styles from "./f1Landing.module.css";
 import { Countdown } from "../../../components/Countdown";
 import { TeamColorDot } from "../../../components/TeamColorDot";
+import { buildPageMetadata } from "../../../lib/pageMetadata";
 
-export const metadata: Metadata = { title: "F1 Race Center" };
+/**
+ * Phase 6 — `/` re-exports this exact module (`app/page.tsx`: `export {
+ * metadata, default } from "./sports/f1/page"`), so this one object serves
+ * both routes. `path: "/"` canonicalizes *both* to the root: they render
+ * byte-identical content, and duplicate-content pages should declare the
+ * same canonical target rather than each pointing at itself (matches
+ * events/[id]/page.tsx's own `generateMetadata` convention of one real
+ * canonical per distinct piece of content).
+ *
+ * `title` is deliberately `{ absolute }`, not a plain string: Next's
+ * title-template docs (`node_modules/next/dist/docs/.../generate-
+ * metadata.md`, "Good to know") say a layout's `template` does NOT apply
+ * to a `page.js` *in the same route segment* as that layout — which is
+ * exactly `/` (root layout + root page.tsx = one segment) — but DOES apply
+ * to a genuinely nested segment. `/sports/f1` is a nested segment even
+ * though it shares this literal metadata object with `/`, so a plain
+ * `title: "F1 Race Center"` string here previously rendered as `/`'s title
+ * verbatim ("F1 Race Center") but as `/sports/f1`'s doubled, templated
+ * title ("F1 Race Center — F1 Race Center") — confirmed over curl before
+ * this fix. `absolute` bypasses the template unconditionally, so both
+ * routes render the identical, correct, undoubled title.
+ */
+export const metadata: Metadata = {
+  ...buildPageMetadata({
+    path: "/",
+    title: "F1 Race Center",
+    description:
+      "Live Formula 1 timing, race control, championship standings, results, and the upcoming race calendar.",
+  }),
+  title: { absolute: "F1 Race Center" },
+};
 
 const SESSION_LABEL: Record<string, string> = {
   FP1: "FP1",

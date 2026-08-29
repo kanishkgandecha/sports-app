@@ -21,16 +21,12 @@ import { buildContentSecurityPolicy, buildStaticSecurityHeaders } from "./lib/se
  * actually needs it (`/`, `/archive`, `/events/[id]`, `/learn`,
  * `/sports/f1`) already renders dynamically (each fetches with
  * `cache: "no-store"` — see lib/api.ts), confirmed in `pnpm build`'s route
- * table (`ƒ`, not `○`). The one exception is the framework's own global
- * `/_next/... 404` page for a URL matching no route at all, which Next
- * statically generates at build time — no nonce exists to embed into that
- * prebuilt HTML, so its own inline hydration script is (correctly, per this
- * CSP) blocked there; the page's server-rendered content still displays
- * (verified over curl), only that one already-broken-URL page loses
- * client-side hydration. Every real route in this product renders inside
- * `app/events/[id]`'s or another dynamic segment's tree and is unaffected
- * (confirmed: an unknown fixture id under `/events/*` already renders
- * through the dynamic route and gets a real nonce).
+ * table (`ƒ`, not `○`). A completely unmatched URL used to fall through to
+ * Next's own built-in, statically-generated 404 boilerplate — no nonce
+ * exists to embed into prebuilt HTML, so its styled-jsx was CSP-blocked
+ * (confirmed by real browser QA, not just curl, in Phase 5). Fixed by
+ * `app/not-found.tsx`, a real page in this app's own dynamic root layout —
+ * see that file's doc comment.
  */
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
@@ -58,14 +54,29 @@ function browserApiOrigin(): string {
   }
 }
 
-// Run on every page request except static assets and Next's own
-// prefetch-only requests, matching the matcher Next's CSP guide
-// recommends — those never render HTML, so they need neither a nonce nor
-// these headers.
+// Run on every page request except static assets, Next's own
+// prefetch-only requests, and the two non-HTML metadata endpoints, matching
+// the matcher Next's CSP guide recommends plus this app's own exclusions —
+// none of these ever render HTML, so they need neither a nonce nor these
+// headers.
+//
+// Phase 6 — robots.txt and sitemap.xml added to the exclusion after real
+// browser QA (Phase 5) found Chromium's own built-in raw-XML viewer
+// injecting an unrelated internal stylesheet into /sitemap.xml, which this
+// CSP correctly blocked (2 console errors; the sitemap's actual XML content
+// was unaffected — a real crawler parses the response body, it doesn't
+// render it in a browser). Confirmed security-neutral before excluding:
+// `X-Content-Type-Options: nosniff` (still set on every other route) is the
+// header that actually prevents content-type confusion, not CSP; these two
+// routes are Next metadata-route handlers that only ever serve deterministic
+// XML/text built from this app's own database, never third-party or
+// user-controlled input, so there is no injectable content for a CSP to
+// guard against here. Static application routes keep the full CSP and
+// security-header set unchanged.
 export const config = {
   matcher: [
     {
-      source: "/((?!_next/static|_next/image|favicon.ico).*)",
+      source: "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

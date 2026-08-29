@@ -3,10 +3,16 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { buildArchiveQuery, getArchiveFixtures, getArchiveOptions, type ArchiveFilters } from "../../lib/archiveApi";
 import { formatDate, venueLine } from "../../lib/format";
+import { buildPageMetadata } from "../../lib/pageMetadata";
 import { growClass } from "./growClass";
 import styles from "./archive.module.css";
 
-export const metadata: Metadata = { title: "F1 archive" };
+export const metadata: Metadata = buildPageMetadata({
+  path: "/archive",
+  title: "F1 archive",
+  description:
+    "Search F1 race weekends across seasons with session-by-session data coverage — completed results, in-progress sessions, and what's scheduled next.",
+});
 type RawSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default function ArchivePage({ searchParams }: { searchParams: RawSearchParams }) {

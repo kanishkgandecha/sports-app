@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { proxy } from "./proxy";
+import { proxy, config } from "./proxy";
 
 // PUBLIC_API_ORIGIN (lib/api.ts) is a module-level constant resolved once
 // from process.env.NEXT_PUBLIC_API_URL at import time, matching the
@@ -34,5 +34,37 @@ describe("proxy", () => {
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(response.headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
     expect(response.headers.get("Permissions-Policy")).toContain("camera=()");
+  });
+});
+
+/**
+ * Phase 6 — robots.txt/sitemap.xml are non-HTML, deterministic,
+ * database-only metadata endpoints; excluding them from the matcher
+ * removed two console errors from Chromium's own built-in XML viewer
+ * injecting a stylesheet this CSP correctly blocked (real crawlers are
+ * unaffected either way — they parse the response body, not a browser
+ * rendering of it). `proxy()` itself has no path logic — this exercises
+ * the actual `source` regex Next compiles into its routing matcher, the
+ * same string it uses at runtime, so a regression here is caught without
+ * needing a full Next dev server.
+ */
+describe("proxy matcher", () => {
+  const pattern = new RegExp(`^${config.matcher[0].source}$`);
+
+  it("excludes the non-HTML metadata endpoints", () => {
+    expect(pattern.test("/robots.txt")).toBe(false);
+    expect(pattern.test("/sitemap.xml")).toBe(false);
+  });
+
+  it("still excludes static assets and the favicon", () => {
+    expect(pattern.test("/_next/static/chunk.js")).toBe(false);
+    expect(pattern.test("/_next/image")).toBe(false);
+    expect(pattern.test("/favicon.ico")).toBe(false);
+  });
+
+  it("still matches every normal application route", () => {
+    for (const path of ["/", "/archive", "/learn", "/sports/f1", "/events/f1-meeting-1292", "/health"]) {
+      expect(pattern.test(path)).toBe(true);
+    }
   });
 });

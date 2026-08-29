@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
 import { apiGet } from "../../lib/api";
+import { buildPageMetadata } from "../../lib/pageMetadata";
 import { LearnGrid } from "./LearnGrid";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = { title: "Learn F1" };
+export const metadata: Metadata = buildPageMetadata({
+  path: "/learn",
+  title: "Learn F1",
+  description:
+    "Plain-language explanations for F1 rules, flags, and race situations — built for following live sessions.",
+});
 
 interface ConceptSummary {
   slug: string;
