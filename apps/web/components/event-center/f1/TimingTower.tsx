@@ -37,26 +37,37 @@ export function TimingTower({ rows, loading, error }: { rows: F1TimingRow[]; loa
   }
 
   return (
-    <div className={styles.timingScroll}>
-      <table className={styles.timingTable}>
-        <thead>
-          <tr>
-            <th scope="col">Pos</th>
-            <th scope="col">Driver</th>
-            <th scope="col">Gap</th>
-            <th scope="col">Interval</th>
-            <th scope="col">Last lap</th>
-            <th scope="col">Best lap</th>
-            <th scope="col">Tyre</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <TimingTowerRow key={row.driver.id} row={row} isLeader={index === 0} />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <p className={styles.scrollHint}>Scroll sideways for gaps, lap times, and tyres.</p>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The overflow region must receive focus so keyboard users can scroll the wide timing table. */}
+      <div className={styles.timingScroll} role="region" aria-label="Session timing table" tabIndex={0}>
+        <table className={styles.timingTable}>
+          <caption className={styles.visuallyHidden}>
+            Driver positions, gaps, lap times, and current tyre compounds
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" className={styles.timingPositionCell}>
+                Pos
+              </th>
+              <th scope="col" className={styles.timingDriverCell}>
+                Driver
+              </th>
+              <th scope="col">Gap</th>
+              <th scope="col">Interval</th>
+              <th scope="col">Last lap</th>
+              <th scope="col">Best lap</th>
+              <th scope="col">Tyre</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <TimingTowerRow key={row.driver.id} row={row} isLeader={index === 0} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
@@ -73,8 +84,8 @@ function TimingTowerRow({ row, isLeader }: { row: F1TimingRow; isLeader: boolean
         .filter(Boolean)
         .join(" ")}
     >
-      <td className={styles.position}>{row.position}</td>
-      <td>
+      <td className={`${styles.position} ${styles.timingPositionCell}`}>{row.position}</td>
+      <td className={styles.timingDriverCell}>
         <div className={styles.driverCell}>
           <span
             className={styles.teamSwatch}

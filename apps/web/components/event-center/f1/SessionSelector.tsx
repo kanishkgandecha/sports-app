@@ -28,23 +28,53 @@ export function SessionSelector({
   onSelect: (sessionId: string) => void;
 }) {
   return (
-    <nav className={styles.sessionTabs} aria-label="Session">
-      {sessions.map((session) => {
+    <div className={styles.sessionTabs} role="tablist" aria-label="Weekend sessions">
+      {sessions.map((session, index) => {
         const isActive = session.id === activeSessionId;
         return (
           <button
             key={session.id}
+            id={`session-tab-${session.id}`}
             type="button"
+            role="tab"
             className={`${styles.sessionTab} ${isActive ? styles.sessionTabActive : ""}`}
-            aria-current={isActive ? "true" : undefined}
+            aria-selected={isActive}
+            aria-controls={`session-panel-${session.id}`}
+            tabIndex={isActive ? 0 : -1}
+            data-lifecycle={session.lifecycle}
             onClick={() => onSelect(session.id)}
+            onKeyDown={(event) => {
+              const targetIndex = keyboardTargetIndex(event.key, index, sessions.length);
+              if (targetIndex === null) return;
+              event.preventDefault();
+              const target = sessions[targetIndex];
+              onSelect(target.id);
+              document.getElementById(`session-tab-${target.id}`)?.focus();
+            }}
           >
-            {SESSION_LABEL[session.type] ?? session.type}
-            {session.lifecycle === "live" && " ·"}
-            {session.detailStatus === "upstream-unavailable" && " · unavailable"}
+            <span className={styles.sessionTabLabel}>{SESSION_LABEL[session.type] ?? session.type}</span>
+            <span className={styles.sessionTabStatus}>{sessionStatusLabel(session)}</span>
           </button>
         );
       })}
-    </nav>
+    </div>
   );
+}
+
+function keyboardTargetIndex(key: string, currentIndex: number, length: number): number | null {
+  if (key === "Home") return 0;
+  if (key === "End") return length - 1;
+  if (key === "ArrowRight") return (currentIndex + 1) % length;
+  if (key === "ArrowLeft") return (currentIndex - 1 + length) % length;
+  return null;
+}
+
+function sessionStatusLabel(session: F1Session): string {
+  if (session.lifecycle === "live") return "Live now";
+  if (session.lifecycle === "upcoming") return "Scheduled";
+  if (session.detailAvailable) return "Data ready";
+  if (session.detailStatus === "upstream-unavailable") return "Unavailable";
+  if (session.detailStatus === "importing") return "Importing";
+  if (session.detailStatus === "failed") return "Retry queued";
+  return "Summary only";
 }

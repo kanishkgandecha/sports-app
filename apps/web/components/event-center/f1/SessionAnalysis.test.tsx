@@ -105,6 +105,21 @@ describe("SessionAnalysis", () => {
     ).toBe(true);
   });
 
+  it("supports arrow-key analysis tabs and keeps the active panel labelled", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+    render(<SessionAnalysis sessionId="f1-session-1" sessionType="RACE" />);
+    await waitFor(() => expect(screen.getByText("72")).toBeInTheDocument());
+
+    const classification = screen.getByRole("tab", { name: "Classification" });
+    classification.focus();
+    await userEvent.keyboard("{ArrowRight}");
+
+    const pace = screen.getByRole("tab", { name: "Lap pace" });
+    expect(pace).toHaveFocus();
+    expect(pace).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", pace.id);
+  });
+
   it("shows an honest empty state when historical analysis has not been imported", async () => {
     vi.stubGlobal(
       "fetch",

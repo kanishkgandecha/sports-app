@@ -32,8 +32,10 @@ describe("SessionSelector", () => {
   it("marks the current session as visually and semantically active", () => {
     const sessions = [session({ id: "fp1", type: "FP1" }), session({ id: "race", type: "RACE" })];
     render(<SessionSelector sessions={sessions} activeSessionId="race" onSelect={vi.fn()} />);
-    expect(screen.getByText("Race")).toHaveAttribute("aria-current", "true");
-    expect(screen.getByText("FP1")).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("tab", { name: /Race/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /Race/ })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("tab", { name: /FP1/ })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: /FP1/ })).toHaveAttribute("tabindex", "-1");
   });
 
   it("calls onSelect with the clicked session's id", async () => {
@@ -48,14 +50,41 @@ describe("SessionSelector", () => {
   it("marks a live session distinctly", () => {
     const sessions = [session({ id: "race", type: "RACE", lifecycle: "live" })];
     render(<SessionSelector sessions={sessions} activeSessionId="race" onSelect={vi.fn()} />);
-    expect(screen.getByText("Race ·")).toBeInTheDocument();
+    expect(screen.getByText("Live now")).toBeInTheDocument();
   });
 
   it("labels a completed session whose provider has no historical detail", () => {
     const sessions = [
-      session({ id: "fp1", type: "FP1", detailAvailable: false, detailStatus: "upstream-unavailable" }),
+      session({
+        id: "fp1",
+        type: "FP1",
+        status: "completed",
+        lifecycle: "completed",
+        detailAvailable: false,
+        detailStatus: "upstream-unavailable",
+      }),
     ];
     render(<SessionSelector sessions={sessions} activeSessionId="fp1" onSelect={vi.fn()} />);
-    expect(screen.getByText("FP1 · unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+  });
+
+  it("supports arrow-key tab navigation and moves focus with selection", async () => {
+    const onSelect = vi.fn();
+    const sessions = [session({ id: "fp1", type: "FP1" }), session({ id: "race", type: "RACE" })];
+    render(<SessionSelector sessions={sessions} activeSessionId="fp1" onSelect={onSelect} />);
+
+    const fp1 = screen.getByRole("tab", { name: /FP1/ });
+    fp1.focus();
+    await userEvent.keyboard("{ArrowRight}");
+
+    expect(onSelect).toHaveBeenCalledWith("race");
+    expect(screen.getByRole("tab", { name: /Race/ })).toHaveFocus();
+  });
+
+  it("announces whether completed session data is ready", () => {
+    const sessions = [session({ id: "race", lifecycle: "completed", status: "completed" })];
+    render(<SessionSelector sessions={sessions} activeSessionId="race" onSelect={vi.fn()} />);
+
+    expect(screen.getByText("Data ready")).toBeInTheDocument();
   });
 });

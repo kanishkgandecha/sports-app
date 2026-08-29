@@ -14,6 +14,11 @@ import { StateView } from "../StateView";
 import styles from "./f1EventCenter.module.css";
 
 type AnalysisTab = "classification" | "pace" | "strategy";
+const ANALYSIS_TABS: Array<{ id: AnalysisTab; label: string }> = [
+  { id: "classification", label: "Classification" },
+  { id: "pace", label: "Lap pace" },
+  { id: "strategy", label: "Tyre strategy" },
+];
 
 interface AnalysisState {
   results: F1SessionResult[];
@@ -91,56 +96,83 @@ export function SessionAnalysis({ sessionId, sessionType }: { sessionId: string;
       </div>
 
       <div className={styles.analysisTabs} role="tablist" aria-label="Session analysis view">
-        <AnalysisTabButton active={tab === "classification"} onClick={() => setTab("classification")}>
-          Classification
-        </AnalysisTabButton>
-        <AnalysisTabButton active={tab === "pace"} onClick={() => setTab("pace")}>
-          Lap pace
-        </AnalysisTabButton>
-        <AnalysisTabButton active={tab === "strategy"} onClick={() => setTab("strategy")}>
-          Tyre strategy
-        </AnalysisTabButton>
+        {ANALYSIS_TABS.map((item, index) => (
+          <AnalysisTabButton
+            key={item.id}
+            tab={item.id}
+            sessionId={sessionId}
+            index={index}
+            active={tab === item.id}
+            onSelect={setTab}
+          >
+            {item.label}
+          </AnalysisTabButton>
+        ))}
       </div>
 
-      {analysis.loading ? (
-        <StateView kind="loading">Loading session analysis…</StateView>
-      ) : analysis.error ? (
-        <StateView kind="error">Session analysis isn&apos;t available right now.</StateView>
-      ) : tab === "classification" ? (
-        <ClassificationTable rows={analysis.results} />
-      ) : tab === "pace" ? (
-        <LapPace
-          drivers={drivers}
-          selectedDriverId={selectedDriverId}
-          onSelectDriver={setSelectedDriverId}
-          laps={laps.items}
-          loading={laps.loading}
-          error={laps.error}
-          truncated={laps.truncated}
-        />
-      ) : (
-        <TyreStrategy stints={analysis.stints} />
-      )}
+      <div
+        id={`analysis-panel-${sessionId}`}
+        role="tabpanel"
+        aria-labelledby={`analysis-tab-${sessionId}-${tab}`}
+        tabIndex={0}
+      >
+        {analysis.loading ? (
+          <StateView kind="loading">Loading session analysis…</StateView>
+        ) : analysis.error ? (
+          <StateView kind="error">Session analysis isn&apos;t available right now.</StateView>
+        ) : tab === "classification" ? (
+          <ClassificationTable rows={analysis.results} />
+        ) : tab === "pace" ? (
+          <LapPace
+            drivers={drivers}
+            selectedDriverId={selectedDriverId}
+            onSelectDriver={setSelectedDriverId}
+            laps={laps.items}
+            loading={laps.loading}
+            error={laps.error}
+            truncated={laps.truncated}
+          />
+        ) : (
+          <TyreStrategy stints={analysis.stints} />
+        )}
+      </div>
     </section>
   );
 }
 
 function AnalysisTabButton({
+  tab,
+  sessionId,
+  index,
   active,
-  onClick,
+  onSelect,
   children,
 }: {
+  tab: AnalysisTab;
+  sessionId: string;
+  index: number;
   active: boolean;
-  onClick: () => void;
+  onSelect: (tab: AnalysisTab) => void;
   children: React.ReactNode;
 }) {
   return (
     <button
+      id={`analysis-tab-${sessionId}-${tab}`}
       type="button"
       role="tab"
       aria-selected={active}
+      aria-controls={`analysis-panel-${sessionId}`}
+      tabIndex={active ? 0 : -1}
       className={[styles.analysisTab, active ? styles.analysisTabActive : ""].filter(Boolean).join(" ")}
-      onClick={onClick}
+      onClick={() => onSelect(tab)}
+      onKeyDown={(event) => {
+        const targetIndex = keyboardTargetIndex(event.key, index, ANALYSIS_TABS.length);
+        if (targetIndex === null) return;
+        event.preventDefault();
+        const target = ANALYSIS_TABS[targetIndex];
+        onSelect(target.id);
+        document.getElementById(`analysis-tab-${sessionId}-${target.id}`)?.focus();
+      }}
     >
       {children}
     </button>
@@ -153,48 +185,53 @@ function ClassificationTable({ rows }: { rows: F1SessionResult[] }) {
   }
   const hasQualifyingPhases = rows.some((row) => row.phases.some((phase) => phase.duration !== null));
   return (
-    <div className={styles.analysisScroll}>
-      <table className={styles.analysisTable}>
-        <thead>
-          <tr>
-            <th scope="col">Pos</th>
-            <th scope="col">Driver</th>
-            {hasQualifyingPhases ? (
-              <>
-                <th scope="col">Q1</th>
-                <th scope="col">Q2</th>
-                <th scope="col">Q3</th>
-              </>
-            ) : (
-              <>
-                <th scope="col">Laps</th>
-                <th scope="col">Time / gap</th>
-                <th scope="col">Pts</th>
-              </>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.driver.id}>
-              <td className={styles.position}>{row.position ?? row.status.toUpperCase()}</td>
-              <td>
-                <DriverLabel driver={row.driver} />
-              </td>
+    <>
+      <p className={styles.scrollHint}>Scroll sideways for the complete classification.</p>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The overflow region must receive focus so keyboard users can scroll the wide classification table. */}
+      <div className={styles.analysisScroll} role="region" aria-label="Session classification table" tabIndex={0}>
+        <table className={styles.analysisTable}>
+          <caption className={styles.visuallyHidden}>Official session classification by driver</caption>
+          <thead>
+            <tr>
+              <th scope="col">Pos</th>
+              <th scope="col">Driver</th>
               {hasQualifyingPhases ? (
-                row.phases.map((phase, index) => <td key={index}>{formatLapTime(phase.duration)}</td>)
+                <>
+                  <th scope="col">Q1</th>
+                  <th scope="col">Q2</th>
+                  <th scope="col">Q3</th>
+                </>
               ) : (
                 <>
-                  <td>{row.lapsCompleted ?? "—"}</td>
-                  <td>{classificationTime(row)}</td>
-                  <td className={styles.pointsCell}>{row.points ?? "—"}</td>
+                  <th scope="col">Laps</th>
+                  <th scope="col">Time / gap</th>
+                  <th scope="col">Pts</th>
                 </>
               )}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.driver.id}>
+                <td className={styles.position}>{row.position ?? row.status.toUpperCase()}</td>
+                <td>
+                  <DriverLabel driver={row.driver} />
+                </td>
+                {hasQualifyingPhases ? (
+                  row.phases.map((phase, index) => <td key={index}>{formatLapTime(phase.duration)}</td>)
+                ) : (
+                  <>
+                    <td>{row.lapsCompleted ?? "—"}</td>
+                    <td>{classificationTime(row)}</td>
+                    <td className={styles.pointsCell}>{row.points ?? "—"}</td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
@@ -247,35 +284,40 @@ function LapPace({
       ) : laps.length === 0 ? (
         <StateView kind="empty">No lap records are available for this driver.</StateView>
       ) : (
-        <div className={styles.analysisScroll}>
-          <table className={styles.analysisTable}>
-            <thead>
-              <tr>
-                <th scope="col">Lap</th>
-                <th scope="col">Lap time</th>
-                <th scope="col">S1</th>
-                <th scope="col">S2</th>
-                <th scope="col">S3</th>
-                <th scope="col">Speed trap</th>
-              </tr>
-            </thead>
-            <tbody>
-              {laps.map((lap) => (
-                <tr key={lap.id}>
-                  <td className={styles.position}>
-                    {lap.lapNumber}
-                    {lap.isPitOutLap && <span className={styles.pitOut}>OUT</span>}
-                  </td>
-                  <td>{formatLapTime(lap.duration)}</td>
-                  <td>{formatSector(lap.sector1)}</td>
-                  <td>{formatSector(lap.sector2)}</td>
-                  <td>{formatSector(lap.sector3)}</td>
-                  <td>{lap.speedTrap === null ? "—" : `${lap.speedTrap} km/h`}</td>
+        <>
+          <p className={styles.scrollHint}>Scroll sideways for sectors and speed-trap data.</p>
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The overflow region must receive focus so keyboard users can scroll the wide lap table. */}
+          <div className={styles.analysisScroll} role="region" aria-label="Driver lap pace table" tabIndex={0}>
+            <table className={styles.analysisTable}>
+              <caption className={styles.visuallyHidden}>Lap-by-lap timing for the selected driver</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Lap</th>
+                  <th scope="col">Lap time</th>
+                  <th scope="col">S1</th>
+                  <th scope="col">S2</th>
+                  <th scope="col">S3</th>
+                  <th scope="col">Speed trap</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {laps.map((lap) => (
+                  <tr key={lap.id}>
+                    <td className={styles.position}>
+                      {lap.lapNumber}
+                      {lap.isPitOutLap && <span className={styles.pitOut}>OUT</span>}
+                    </td>
+                    <td>{formatLapTime(lap.duration)}</td>
+                    <td>{formatSector(lap.sector1)}</td>
+                    <td>{formatSector(lap.sector2)}</td>
+                    <td>{formatSector(lap.sector3)}</td>
+                    <td>{lap.speedTrap === null ? "—" : `${lap.speedTrap} km/h`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
       {truncated && <p className={styles.analysisNote}>Showing the first 2,000 laps.</p>}
     </div>
@@ -369,4 +411,12 @@ function compoundClass(compound: string | null): string {
   if (compound === "INTERMEDIATE") return styles.tyreIntermediate;
   if (compound === "WET") return styles.tyreWet;
   return "";
+}
+
+function keyboardTargetIndex(key: string, currentIndex: number, length: number): number | null {
+  if (key === "Home") return 0;
+  if (key === "End") return length - 1;
+  if (key === "ArrowRight") return (currentIndex + 1) % length;
+  if (key === "ArrowLeft") return (currentIndex - 1 + length) % length;
+  return null;
 }

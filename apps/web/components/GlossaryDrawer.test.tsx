@@ -28,6 +28,36 @@ describe("GlossaryDrawer", () => {
     mockApiGet.mockRejectedValueOnce(new Error("network error"));
     render(<GlossaryDrawer slug="safety-car" onClose={vi.fn()} onNavigate={vi.fn()} />);
     await waitFor(() => expect(screen.getByText(/couldn't load/i)).toBeInTheDocument());
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
+  });
+
+  it("retries a transient failure and renders the explanation when the next request succeeds", async () => {
+    mockApiGet.mockRejectedValueOnce(new Error("network error")).mockResolvedValueOnce(SAFETY_CAR_RESPONSE);
+    const callsBefore = mockApiGet.mock.calls.length;
+    render(<GlossaryDrawer slug="safety-car" onClose={vi.fn()} onNavigate={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /try again/i }));
+
+    expect(await screen.findByRole("heading", { name: "Safety Car" })).toBeInTheDocument();
+    expect(mockApiGet.mock.calls.length - callsBefore).toBe(2);
+  });
+
+  it("turns internal Markdown concept links into in-drawer navigation controls", async () => {
+    mockApiGet.mockResolvedValueOnce({
+      ...SAFETY_CAR_RESPONSE,
+      concept: {
+        ...SAFETY_CAR_RESPONSE.concept,
+        detailExplanation: "The field resumes at the [Safety Car Restart](#safety-car-restart).",
+      },
+    });
+    const onNavigate = vi.fn();
+    render(<GlossaryDrawer slug="safety-car" onClose={vi.fn()} onNavigate={onNavigate} />);
+
+    const link = await screen.findByRole("button", { name: "Safety Car Restart" });
+    expect(screen.queryByText(/\[Safety Car Restart\]/)).not.toBeInTheDocument();
+    await userEvent.click(link);
+    expect(onNavigate).toHaveBeenCalledWith("safety-car-restart");
   });
 
   it("closes on Escape", async () => {

@@ -1,6 +1,8 @@
+import styles from "./eventState.module.css";
+
 export default function EventLoading() {
   return (
-    <div role="status" style={{ color: "var(--color-text-faint)", fontSize: "var(--font-size-sm)" }}>
+    <div role="status" className={`${styles.state} ${styles.loading}`}>
       Loading event…
     </div>
   );

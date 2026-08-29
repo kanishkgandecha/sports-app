@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getF1ConstructorStandings,
   getF1DriverStandings,
@@ -20,6 +20,7 @@ interface ListState<T> {
 const IDLE_LIST: ListState<never> = { items: [], loading: true, error: false };
 
 type StandingsKind = "drivers" | "constructors";
+const STANDINGS_KINDS: StandingsKind[] = ["drivers", "constructors"];
 
 /**
  * Championship standings (Checkpoint 6 — docs/CONTEXT.md Checkpoint 6 §6),
@@ -42,6 +43,24 @@ export function StandingsPanel({ year, onExplain }: { year: number; onExplain: (
   const [kind, setKind] = useState<StandingsKind>("drivers");
   const [drivers, setDrivers] = useState<ListState<F1DriverStanding>>(IDLE_LIST);
   const [constructors, setConstructors] = useState<ListState<F1ConstructorStanding>>(IDLE_LIST);
+  const tabRefs = useRef<Record<StandingsKind, HTMLButtonElement | null>>({ drivers: null, constructors: null });
+
+  function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, current: StandingsKind) {
+    const currentIndex = STANDINGS_KINDS.indexOf(current);
+    let next: StandingsKind | undefined;
+
+    if (event.key === "ArrowRight") next = STANDINGS_KINDS[(currentIndex + 1) % STANDINGS_KINDS.length];
+    if (event.key === "ArrowLeft") {
+      next = STANDINGS_KINDS[(currentIndex - 1 + STANDINGS_KINDS.length) % STANDINGS_KINDS.length];
+    }
+    if (event.key === "Home") next = STANDINGS_KINDS[0];
+    if (event.key === "End") next = STANDINGS_KINDS[STANDINGS_KINDS.length - 1];
+    if (!next) return;
+
+    event.preventDefault();
+    setKind(next);
+    tabRefs.current[next]?.focus();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -78,39 +97,55 @@ export function StandingsPanel({ year, onExplain }: { year: number; onExplain: (
 
       <div className={styles.standingsToggle} role="tablist" aria-label="Standings type">
         <button
+          id={`standings-tab-drivers-${year}`}
+          ref={(node) => {
+            tabRefs.current.drivers = node;
+          }}
           type="button"
           role="tab"
           aria-selected={kind === "drivers"}
+          aria-controls={`standings-panel-${year}`}
+          tabIndex={kind === "drivers" ? 0 : -1}
           className={[styles.standingsToggleButton, kind === "drivers" ? styles.standingsToggleButtonActive : ""].join(
             " ",
           )}
           onClick={() => setKind("drivers")}
+          onKeyDown={(event) => handleTabKeyDown(event, "drivers")}
         >
           Drivers
         </button>
         <button
+          id={`standings-tab-constructors-${year}`}
+          ref={(node) => {
+            tabRefs.current.constructors = node;
+          }}
           type="button"
           role="tab"
           aria-selected={kind === "constructors"}
+          aria-controls={`standings-panel-${year}`}
+          tabIndex={kind === "constructors" ? 0 : -1}
           className={[
             styles.standingsToggleButton,
             kind === "constructors" ? styles.standingsToggleButtonActive : "",
           ].join(" ")}
           onClick={() => setKind("constructors")}
+          onKeyDown={(event) => handleTabKeyDown(event, "constructors")}
         >
           Constructors
         </button>
       </div>
 
-      {kind === "drivers" ? (
-        <DriverStandingsTable rows={drivers.items} loading={drivers.loading} error={drivers.error} />
-      ) : (
-        <ConstructorStandingsTable
-          rows={constructors.items}
-          loading={constructors.loading}
-          error={constructors.error}
-        />
-      )}
+      <div id={`standings-panel-${year}`} role="tabpanel" aria-labelledby={`standings-tab-${kind}-${year}`}>
+        {kind === "drivers" ? (
+          <DriverStandingsTable rows={drivers.items} loading={drivers.loading} error={drivers.error} />
+        ) : (
+          <ConstructorStandingsTable
+            rows={constructors.items}
+            loading={constructors.loading}
+            error={constructors.error}
+          />
+        )}
+      </div>
     </section>
   );
 }
@@ -129,8 +164,11 @@ function DriverStandingsTable({
   if (rows.length === 0) return <StateView kind="empty">No driver standings yet for this season.</StateView>;
 
   return (
-    <div className={styles.timingScroll}>
+    // The overflow region needs a keyboard focus target so the wide table can scroll without a pointer.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+    <div className={styles.timingScroll} role="region" aria-label="Driver championship standings" tabIndex={0}>
       <table className={styles.timingTable}>
+        <caption className={styles.visuallyHidden}>Driver championship positions, points, and wins</caption>
         <thead>
           <tr>
             <th scope="col">Pos</th>
@@ -183,8 +221,11 @@ function ConstructorStandingsTable({
   if (rows.length === 0) return <StateView kind="empty">No constructor standings yet for this season.</StateView>;
 
   return (
-    <div className={styles.timingScroll}>
+    // The overflow region needs a keyboard focus target so the wide table can scroll without a pointer.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+    <div className={styles.timingScroll} role="region" aria-label="Constructor championship standings" tabIndex={0}>
       <table className={styles.timingTable}>
+        <caption className={styles.visuallyHidden}>Constructor championship positions, points, and wins</caption>
         <thead>
           <tr>
             <th scope="col">Pos</th>

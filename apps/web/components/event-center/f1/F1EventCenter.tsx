@@ -51,10 +51,21 @@ const REFETCH_DEBOUNCE_MS = 400;
  * order and weight (§2's information hierarchy; see f1EventCenter.module.css
  * for how the timing tower dominates the layout).
  */
-export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessions: F1Session[] }) {
+export function F1EventCenter({
+  fixture,
+  sessions,
+  initialSessionId,
+}: {
+  fixture: F1Fixture;
+  sessions: F1Session[];
+  initialSessionId?: string;
+}) {
   const availableSessions = useMemo(() => sessions, [sessions]);
   const [activeSessionId, setActiveSessionId] = useState(
-    () => pickInitialSession(availableSessions)?.id ?? availableSessions[0]?.id,
+    () =>
+      availableSessions.find((session) => session.id === initialSessionId)?.id ??
+      pickInitialSession(availableSessions)?.id ??
+      availableSessions[0]?.id,
   );
   const activeSession = availableSessions.find((s) => s.id === activeSessionId);
 
@@ -138,6 +149,13 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
     return <p style={{ color: "var(--color-text-faint)" }}>This fixture has no sessions yet.</p>;
   }
 
+  function selectSession(sessionId: string) {
+    setActiveSessionId(sessionId);
+    const params = new URLSearchParams(window.location.search);
+    params.set("session", sessionId);
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}${window.location.hash}`);
+  }
+
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
@@ -164,64 +182,68 @@ export function F1EventCenter({ fixture, sessions }: { fixture: F1Fixture; sessi
           </span>
           <FreshnessIndicator state={freshness.state} updatedAt={freshness.updatedAt ?? new Date().toISOString()} />
         </div>
-        <SessionSelector
-          sessions={availableSessions}
-          activeSessionId={activeSession.id}
-          onSelect={setActiveSessionId}
-        />
+        <SessionSelector sessions={availableSessions} activeSessionId={activeSession.id} onSelect={selectSession} />
       </header>
 
-      {!activeSession.detailAvailable && activeSession.lifecycle !== "live" && (
-        <div className={styles.coverageNotice} role="status">
-          <strong>
-            {activeSession.lifecycle === "upcoming"
-              ? "Scheduled session"
-              : detailStatusLabel(activeSession.detailStatus)}
-          </strong>
-          <span>
-            {activeSession.lifecycle === "upcoming"
-              ? "Detailed timing will appear when this session begins."
-              : (activeSession.detailReason ??
-                "The calendar and session summary are available, but detailed timing has not been imported yet.")}
-          </span>
-        </div>
-      )}
-
-      {(activeSession.detailAvailable || activeSession.lifecycle === "live") && (
-        <div className={styles.mainGrid}>
-          <section className={styles.section} aria-label="Timing">
-            <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>Timing</h2>
-            </div>
-            <TimingTower rows={timing.items} loading={timing.loading} error={timing.error} />
-          </section>
-
-          <div className={styles.sidebar}>
-            <section className={styles.section} aria-label="Race control">
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Race control</h2>
-              </div>
-              <RaceControlFeed
-                messages={raceControl.items}
-                loading={raceControl.loading}
-                error={raceControl.error}
-                onExplain={setEducationSlug}
-              />
-            </section>
-
-            <section className={styles.section} aria-label="Pit stops">
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Pit stops</h2>
-              </div>
-              <PitStopList stops={pitStops.items} loading={pitStops.loading} error={pitStops.error} />
-            </section>
+      <div
+        id={`session-panel-${activeSession.id}`}
+        className={styles.sessionPanel}
+        role="tabpanel"
+        aria-labelledby={`session-tab-${activeSession.id}`}
+        tabIndex={0}
+      >
+        {!activeSession.detailAvailable && activeSession.lifecycle !== "live" && (
+          <div className={styles.coverageNotice} role="status">
+            <strong>
+              {activeSession.lifecycle === "upcoming"
+                ? "Scheduled session"
+                : detailStatusLabel(activeSession.detailStatus)}
+            </strong>
+            <span>
+              {activeSession.lifecycle === "upcoming"
+                ? "Detailed timing will appear when this session begins."
+                : (activeSession.detailReason ??
+                  "The calendar and session summary are available, but detailed timing has not been imported yet.")}
+            </span>
           </div>
-        </div>
-      )}
+        )}
 
-      {activeSession.lifecycle === "completed" && activeSession.detailAvailable && (
-        <SessionAnalysis sessionId={activeSession.id} sessionType={activeSession.type} />
-      )}
+        {(activeSession.detailAvailable || activeSession.lifecycle === "live") && (
+          <div className={styles.mainGrid}>
+            <section className={styles.section} aria-label="Timing">
+              <div className={styles.sectionHeader}>
+                <h2 className={styles.sectionTitle}>Timing</h2>
+              </div>
+              <TimingTower rows={timing.items} loading={timing.loading} error={timing.error} />
+            </section>
+
+            <div className={styles.sidebar}>
+              <section className={styles.section} aria-label="Race control">
+                <div className={styles.sectionHeader}>
+                  <h2 className={styles.sectionTitle}>Race control</h2>
+                </div>
+                <RaceControlFeed
+                  messages={raceControl.items}
+                  loading={raceControl.loading}
+                  error={raceControl.error}
+                  onExplain={setEducationSlug}
+                />
+              </section>
+
+              <section className={styles.section} aria-label="Pit stops">
+                <div className={styles.sectionHeader}>
+                  <h2 className={styles.sectionTitle}>Pit stops</h2>
+                </div>
+                <PitStopList stops={pitStops.items} loading={pitStops.loading} error={pitStops.error} />
+              </section>
+            </div>
+          </div>
+        )}
+
+        {activeSession.lifecycle === "completed" && activeSession.detailAvailable && (
+          <SessionAnalysis sessionId={activeSession.id} sessionType={activeSession.type} />
+        )}
+      </div>
 
       {/* Season-scoped, not session-scoped — see StandingsPanel's doc
           comment for why this sits outside .mainGrid's session-driven

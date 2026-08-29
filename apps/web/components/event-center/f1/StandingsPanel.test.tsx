@@ -68,6 +68,42 @@ describe("StandingsPanel", () => {
     expect((fetchImpl as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBeforeSwitch); // both were already fetched up front
   });
 
+  it("connects the active tab to its panel and supports arrow, Home, and End keyboard navigation", async () => {
+    vi.stubGlobal("fetch", mockFetchOk());
+    render(<StandingsPanel year={2026} onExplain={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText("219")).toBeInTheDocument());
+
+    const drivers = screen.getByRole("tab", { name: "Drivers" });
+    const constructors = screen.getByRole("tab", { name: "Constructors" });
+    const panel = screen.getByRole("tabpanel");
+    expect(drivers).toHaveAttribute("aria-controls", panel.id);
+    expect(panel).toHaveAttribute("aria-labelledby", drivers.id);
+    expect(drivers).toHaveAttribute("tabindex", "0");
+    expect(constructors).toHaveAttribute("tabindex", "-1");
+
+    drivers.focus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(constructors).toHaveFocus();
+    expect(constructors).toHaveAttribute("aria-selected", "true");
+    expect(panel).toHaveAttribute("aria-labelledby", constructors.id);
+    expect(screen.getByText("379")).toBeInTheDocument();
+
+    await userEvent.keyboard("{Home}");
+    expect(drivers).toHaveFocus();
+    await userEvent.keyboard("{End}");
+    expect(constructors).toHaveFocus();
+  });
+
+  it("labels each horizontally scrollable standings table as a keyboard-focusable region", async () => {
+    vi.stubGlobal("fetch", mockFetchOk());
+    render(<StandingsPanel year={2026} onExplain={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText("219")).toBeInTheDocument());
+
+    const region = screen.getByRole("region", { name: "Driver championship standings" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(screen.getByText("Driver championship positions, points, and wins")).toBeInTheDocument();
+  });
+
   it("never renders a movement/position-change column — nothing here is truthfully calculable from a single snapshot", async () => {
     vi.stubGlobal("fetch", mockFetchOk());
     render(<StandingsPanel year={2026} onExplain={vi.fn()} />);

@@ -93,6 +93,14 @@ describe("TimingTower", () => {
     }
   });
 
+  it("exposes the horizontally scrollable timing table as a keyboard-focusable named region", () => {
+    render(<TimingTower rows={[row({})]} loading={false} error={false} />);
+
+    const region = screen.getByRole("region", { name: "Session timing table" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(screen.getByText(/Driver positions, gaps, lap times/i)).toBeInTheDocument();
+  });
+
   it("flashes a row via the shared LiveValue mechanism (components/LiveValue.tsx) when its position changes", () => {
     const d1 = { id: "d1", name: "Leader", shortName: "LDR", avatarUrl: null, team: null };
     const { rerender } = render(
