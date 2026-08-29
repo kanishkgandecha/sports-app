@@ -101,7 +101,6 @@ export async function liveRoutes(app: FastifyInstance, bus: LiveEventBus, corsOr
       // request log). `socket.setTimeout(0)` disables Node's idle timeout
       // for *this one* long-lived connection only; every other route
       // keeps the global 10-second connectionTimeout unchanged.
-      disableIdleTimeout(req.raw.socket);
       reply.raw.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
@@ -109,6 +108,9 @@ export async function liveRoutes(app: FastifyInstance, bus: LiveEventBus, corsOr
         ...corsHeadersFor(req.headers.origin, corsOrigins),
       });
       reply.raw.write(`event: ready\ndata: ${JSON.stringify({ sessionId })}\n\n`);
+      // Establishing the raw response can reapply `server.timeout` on
+      // Linux, so disable it only after the SSE headers/body are live.
+      disableIdleTimeout(req.raw.socket);
 
       let replaying = cursor !== null;
       const buffered: SequencedLiveEvent[] = [];
