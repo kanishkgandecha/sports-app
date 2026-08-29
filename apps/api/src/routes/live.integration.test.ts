@@ -213,13 +213,17 @@ describe("GET /api/sessions/:sessionId/stream (integration, real Postgres + LIST
     await disallowed.body?.cancel();
   });
 
-  it("disables Node's per-socket idle timeout on the real connection socket (not just a global config value)", async () => {
+  it("keeps the real SSE connection open past Node's global per-socket idle timeout", async () => {
     app.server.closeIdleConnections();
     const nextSocket = new Promise<import("node:net").Socket>((resolve) => app.server.once("connection", resolve));
     const [socket, response] = await Promise.all([nextSocket, fetch(`${baseUrl}/api/sessions/${SESSION_ID}/stream`)]);
-    expect(socket.timeout).toBe(0); // not the app's global 10_000ms connectionTimeout
-    await response.body?.cancel();
-  });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 10_500));
+      expect(socket.destroyed).toBe(false);
+    } finally {
+      await response.body?.cancel();
+    }
+  }, 15_000);
 
   it("sends a ready event immediately, then delivers a genuinely new live event", async () => {
     const response = await fetch(`${baseUrl}/api/sessions/${SESSION_ID}/stream`);
