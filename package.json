@@ -20,7 +20,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:unit": "turbo run test",
-    "test:integration": "node scripts/require-database-url.mjs && turbo run test:integration",
+    "test:integration": "node scripts/require-database-url.mjs && turbo run test:integration --concurrency=1",
     "db:generate": "pnpm --filter @sports/db exec prisma generate",
     "db:migrate": "node --env-file=.env scripts/run-with-root-env.mjs pnpm --filter @sports/db exec prisma migrate dev",
     "db:migrate:deploy": "node --env-file=.env scripts/run-with-root-env.mjs pnpm --filter @sports/db exec prisma migrate deploy",

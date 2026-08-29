@@ -9,7 +9,7 @@
     "start": "node --env-file=../../.env dist/server.cjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --exclude '**/*.integration.test.ts'",
-    "test:integration": "vitest run .integration.test.ts"
+    "test:integration": "vitest run .integration.test.ts --no-file-parallelism"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
