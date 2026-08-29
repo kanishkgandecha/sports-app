@@ -143,8 +143,10 @@ describe("StandingsPanel", () => {
     const { container } = render(<StandingsPanel year={2026} onExplain={vi.fn()} />);
     await waitFor(() => expect(screen.getByText("219")).toBeInTheDocument());
     expect(container.querySelector("[style]")).toBeNull();
-    const rules = Array.from(sheetEl.sheet!.cssRules as unknown as CSSStyleRule[]);
-    expect(rules.some((rule) => rule.style.background === "rgb(39, 244, 210)")).toBe(true);
+    await waitFor(() => {
+      const rules = Array.from(sheetEl.sheet!.cssRules as unknown as CSSStyleRule[]);
+      expect(rules.some((rule) => rule.style.background === "rgb(39, 244, 210)")).toBe(true);
+    });
 
     await userEvent.click(screen.getByRole("tab", { name: "Constructors" }));
     expect(container.querySelector("[style]")).toBeNull();
