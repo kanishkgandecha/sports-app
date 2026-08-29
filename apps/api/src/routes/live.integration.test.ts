@@ -115,7 +115,6 @@ async function readLiveEvents(
 describe("GET /api/sessions/:sessionId/stream (integration, real Postgres + LISTEN/NOTIFY)", () => {
   let app: FastifyInstance;
   let baseUrl: string;
-  const sockets: import("node:net").Socket[] = [];
 
   beforeAll(async () => {
     const sport = await prisma.sport.upsert({
@@ -184,7 +183,6 @@ describe("GET /api/sessions/:sessionId/stream (integration, real Postgres + LIST
     const address = app.server.address();
     if (!address || typeof address === "string") throw new Error("expected a real listening TCP address");
     baseUrl = `http://127.0.0.1:${address.port}`;
-    app.server.on("connection", (socket) => sockets.push(socket));
   });
 
   afterAll(async () => {
@@ -216,11 +214,9 @@ describe("GET /api/sessions/:sessionId/stream (integration, real Postgres + LIST
   });
 
   it("disables Node's per-socket idle timeout on the real connection socket (not just a global config value)", async () => {
-    const socketsBefore = sockets.length;
-    const response = await fetch(`${baseUrl}/api/sessions/${SESSION_ID}/stream`);
-    await new Promise((resolve) => setTimeout(resolve, 20)); // let the 'connection' listener fire
-    const socket = sockets[socketsBefore];
-    expect(socket).toBeDefined();
+    app.server.closeIdleConnections();
+    const nextSocket = new Promise<import("node:net").Socket>((resolve) => app.server.once("connection", resolve));
+    const [socket, response] = await Promise.all([nextSocket, fetch(`${baseUrl}/api/sessions/${SESSION_ID}/stream`)]);
     expect(socket.timeout).toBe(0); // not the app's global 10_000ms connectionTimeout
     await response.body?.cancel();
   });
